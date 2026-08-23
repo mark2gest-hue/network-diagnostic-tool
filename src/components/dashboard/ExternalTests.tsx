@@ -16,7 +16,10 @@ import {
   Hash, 
   ArrowUpRight,
   GitCommit,
-  Network
+  Network,
+  Share2,
+  Timer,
+  Zap
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { ExportButton } from '../ExportButton';
@@ -29,7 +32,7 @@ export function ExternalTests() {
 
   const activeCount = Object.values(loading).filter(Boolean).length;
   const finishedCount = Object.values(results).filter(r => r !== null && r.status !== 'running' && r.status !== 'idle').length;
-  const totalTests = 8;
+  const totalTests = 12;
   const progress = (finishedCount / totalTests) * 100;
 
   return (
@@ -41,10 +44,10 @@ export function ExternalTests() {
             <div className="p-2 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
               <Globe className="w-5 h-5" />
             </div>
-            External Network Diagnostics
+            External Network Diagnostics Suite (12 Moduli)
           </h2>
           <p className="text-sm text-zinc-400">
-            Analisi server-side profonda di risoluzione DNS, crittografia SSL, traceroute hop, IPv6 e disponibilità porte.
+            Analisi profonda di propagazione DNS globale, waterfall TTFB, protocolli HTTP/2-3, traceroute, IPv6 e crittografia SSL.
           </p>
         </div>
 
@@ -70,7 +73,7 @@ export function ExternalTests() {
               ) : (
                 <Play className="mr-2 h-4 w-4 fill-current" />
               )}
-              {activeCount > 0 ? 'Esecuzione...' : 'Esegui Tutti'}
+              {activeCount > 0 ? 'Esecuzione...' : 'Esegui Tutti (12)'}
             </Button>
           </div>
         </div>
@@ -100,7 +103,7 @@ export function ExternalTests() {
           <div className="flex justify-between text-xs text-blue-400 font-bold uppercase tracking-widest">
             <span className="flex items-center gap-2">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              Analisi diagnostica in corso su <span className="font-mono text-white">{target}</span>...
+              Analisi diagnostica in corso ({finishedCount}/12 test completati)...
             </span>
             <span>{Math.round(progress)}%</span>
           </div>
@@ -108,7 +111,7 @@ export function ExternalTests() {
         </div>
       )}
 
-      {/* Test Cards Grid (8 Cards) */}
+      {/* Test Cards Grid (12 Diagnostic Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         <TestCard 
           title="DNS Lookup"
@@ -117,6 +120,30 @@ export function ExternalTests() {
           test={results.dns}
           loading={loading.dns}
           onRun={() => runTest('dns', target)}
+        />
+        <TestCard 
+          title="Propagazione DNS Globale"
+          description="Test su 6 resolver mondiali (Google, Cloudflare, Quad9)"
+          icon={Globe}
+          test={results.propagation}
+          loading={loading.propagation}
+          onRun={() => runTest('propagation', target)}
+        />
+        <TestCard 
+          title="Waterfall TTFB & Latenza"
+          description="Scomposizione millisecondi DNS, TCP, TLS e Server"
+          icon={Timer}
+          test={results.ttfb}
+          loading={loading.ttfb}
+          onRun={() => runTest('ttfb', target)}
+        />
+        <TestCard 
+          title="Protocolli HTTP/2 & HTTP/3"
+          description="Negoziazione ALPN, QUIC/UDP e cifratura"
+          icon={Zap}
+          test={results.protocols}
+          loading={loading.protocols}
+          onRun={() => runTest('protocols', target)}
         />
         <TestCard 
           title="Traceroute Visivo"
@@ -135,7 +162,7 @@ export function ExternalTests() {
           onRun={() => runTest('ipv6', target)}
         />
         <TestCard 
-          title="Ping / Latenza"
+          title="Ping / Latenza Socket"
           description="Tempo di risposta TCP socket 443/80"
           icon={Activity}
           test={results.ping}
@@ -167,7 +194,15 @@ export function ExternalTests() {
           onRun={() => runTest('whois', target)}
         />
         <TestCard 
-          title="HTTP & Headers"
+          title="Reverse DNS (PTR)"
+          description="Risoluzione inversa host dall'IP pubblico"
+          icon={Share2}
+          test={results.reverse_dns}
+          loading={loading.reverse_dns}
+          onRun={() => runTest('reverse_dns', target)}
+        />
+        <TestCard 
+          title="HTTP Status & Headers"
           description="Codice di stato HTTP e tempi di caricamento"
           icon={ArrowUpRight}
           test={results.http}

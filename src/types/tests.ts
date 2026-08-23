@@ -9,8 +9,30 @@ export interface TestResult {
   timestamp: number;
 }
 
-export type ExternalTestType = 'dns' | 'whois' | 'ping' | 'portscan' | 'ssl' | 'http' | 'rbl' | 'traceroute' | 'ipv6';
-export type InternalTestType = 'public_ip' | 'local_ip' | 'dns_speed' | 'latency' | 'speed' | 'wifi' | 'packet_loss' | 'dns_leak';
+export type ExternalTestType = 
+  | 'dns' 
+  | 'whois' 
+  | 'ping' 
+  | 'portscan' 
+  | 'ssl' 
+  | 'http' 
+  | 'rbl' 
+  | 'traceroute' 
+  | 'ipv6'
+  | 'propagation'
+  | 'ttfb'
+  | 'reverse_dns'
+  | 'protocols';
+
+export type InternalTestType = 
+  | 'public_ip' 
+  | 'local_ip' 
+  | 'dns_speed' 
+  | 'latency' 
+  | 'speed' 
+  | 'wifi' 
+  | 'packet_loss' 
+  | 'dns_leak';
 
 export interface User {
   id: string;

@@ -14,6 +14,10 @@ export function useExternalTests() {
     rbl: null,
     traceroute: null,
     ipv6: null,
+    propagation: null,
+    ttfb: null,
+    reverse_dns: null,
+    protocols: null,
   });
 
   const [loading, setLoading] = useState<Record<ExternalTestType, boolean>>({
@@ -26,6 +30,10 @@ export function useExternalTests() {
     rbl: false,
     traceroute: false,
     ipv6: false,
+    propagation: false,
+    ttfb: false,
+    reverse_dns: false,
+    protocols: false,
   });
 
   const updateResult = (type: ExternalTestType, result: Partial<TestResult>) => {
@@ -48,8 +56,9 @@ export function useExternalTests() {
     updateResult(type, { status: 'running' });
 
     try {
-      const paramName = type === 'rbl' ? 'ip' : (['dns', 'whois', 'ssl', 'ipv6'].includes(type) ? 'domain' : 'target');
-      const res = await fetch(`/api/tests/${type}?${paramName}=${encodeURIComponent(target)}`);
+      const endpoint = type === 'reverse_dns' ? 'reverse-dns' : type === 'protocols' ? 'http-protocols' : type;
+      const paramName = ['dns', 'whois', 'ssl', 'ipv6', 'propagation'].includes(type) ? 'domain' : type === 'rbl' ? 'ip' : 'target';
+      const res = await fetch(`/api/tests/${endpoint}?${paramName}=${encodeURIComponent(target)}`);
       const data = await res.json();
 
       if (res.ok) {
@@ -58,7 +67,7 @@ export function useExternalTests() {
         updateResult(type, { status: 'fail', error: data.error });
       }
     } catch {
-      updateResult(type, { status: 'fail', error: 'Request failed' });
+      updateResult(type, { status: 'fail', error: 'Test fallito' });
     } finally {
       setLoading(prev => ({ ...prev, [type]: false }));
     }
@@ -69,10 +78,21 @@ export function useExternalTests() {
     loading,
     runTest,
     runAll: async (target: string) => {
-      const tests: ExternalTestType[] = ['dns', 'whois', 'ping', 'portscan', 'ssl', 'http', 'traceroute', 'ipv6'];
-      for (const t of tests) {
-        await runTest(t, target);
-      }
+      const tests: ExternalTestType[] = [
+        'dns', 
+        'propagation', 
+        'ttfb', 
+        'protocols', 
+        'traceroute', 
+        'ipv6', 
+        'ping', 
+        'portscan', 
+        'ssl', 
+        'whois', 
+        'reverse_dns', 
+        'http'
+      ];
+      await Promise.allSettled(tests.map(t => runTest(t, target)));
     }
   };
 }
