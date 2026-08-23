@@ -65,7 +65,7 @@ export default function Dashboard() {
               }`}
             >
               <Wifi className="w-4 h-4" />
-              Internal / WiFi
+              Internal / LAN & WiFi
             </button>
 
             <button 

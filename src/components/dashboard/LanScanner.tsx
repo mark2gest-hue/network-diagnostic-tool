@@ -106,11 +106,11 @@ export function LanScanner() {
               <Wifi className="w-5 h-5" />
             </div>
             <h3 className="text-lg font-bold text-white tracking-tight">
-              Scansione Rete WiFi & Mappa Dispositivi Connessi
+              Scansione Rete Locale (LAN / WiFi & Cavo Ethernet)
             </h3>
           </div>
           <p className="text-xs text-zinc-400 max-w-2xl">
-            Rileva l&apos;IP della tua scheda WiFi, il Gateway del router e scansiona la tabella ARP della subnet locale per scoprire tutti gli host attivi.
+            Rileva automaticamente la scheda attiva (WiFi o Cavo Ethernet), l&apos;IP locale, il Gateway del router e scansiona la tabella ARP della subnet per scoprire tutti i dispositivi connessi.
           </p>
         </div>
 
@@ -137,7 +137,7 @@ export function LanScanner() {
             ) : (
               <>
                 <Search className="w-4 h-4 mr-2" />
-                {data ? 'Ripeti Scansione' : 'Avvia Scansione WiFi'}
+                {data ? 'Ripeti Scansione Rete' : 'Avvia Scansione Rete'}
               </>
             )}
           </Button>
