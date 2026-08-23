@@ -9,7 +9,7 @@ import {
   Layers, 
   FileCode, 
   CheckCircle2, 
-  Cookie 
+  Cookie
 } from 'lucide-react';
 
 interface ResultRendererProps {
@@ -43,6 +43,13 @@ interface ShieldItem {
   vendor: string;
 }
 
+interface TracerouteHop {
+  hop: number;
+  ip: string;
+  host: string;
+  latency: number;
+}
+
 export function ResultRenderer({ result }: ResultRendererProps) {
   if (!result || typeof result !== 'object') {
     return <span className="text-xs text-zinc-400">{String(result ?? 'Nessun dato')}</span>;
@@ -50,7 +57,102 @@ export function ResultRenderer({ result }: ResultRendererProps) {
 
   const data = result as Record<string, unknown>;
 
-  // 1. Vulnerability: Exposed Sensitive Files
+  // 1. Traceroute Visual Hops Chain
+  if ('hops' in data && Array.isArray(data.hops)) {
+    const hops = data.hops as TracerouteHop[];
+    return (
+      <div className="space-y-2 text-xs">
+        <div className="flex items-center justify-between text-zinc-400 pb-1">
+          <span className="font-semibold text-zinc-300">Tratta di Rete ({hops.length} Nodi / Hop):</span>
+          <span className="font-mono text-[11px] text-zinc-500">Destinazione: {String(data.target)}</span>
+        </div>
+
+        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          {hops.map((h, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/60 border border-zinc-800 font-mono">
+              <div className="flex items-center gap-2.5">
+                <span className="w-5 h-5 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 flex items-center justify-center text-[10px] font-bold shrink-0">
+                  {h.hop}
+                </span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-zinc-200 truncate max-w-[180px]">{h.ip}</span>
+                  {h.host && h.host !== h.ip && (
+                    <span className="text-[9px] text-zinc-500 truncate max-w-[180px]">{h.host}</span>
+                  )}
+                </div>
+              </div>
+
+              <Badge 
+                variant="outline" 
+                className={`text-[10px] ${
+                  h.latency < 20 ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' : h.latency < 80 ? 'bg-amber-950/40 text-amber-400 border-amber-500/30' : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                }`}
+              >
+                {h.latency} ms
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 2. IPv6 & Dual-Stack Connectivity
+  if ('isDualStack' in data || 'ipv6Addresses' in data) {
+    const isDual = Boolean(data.isDualStack);
+    const ipv4List = Array.isArray(data.ipv4Addresses) ? (data.ipv4Addresses as string[]) : [];
+    const ipv6List = Array.isArray(data.ipv6Addresses) ? (data.ipv6Addresses as string[]) : [];
+
+    return (
+      <div className="space-y-2.5 text-xs">
+        <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+          isDual ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' : 'bg-amber-950/30 border-amber-500/30 text-amber-300'
+        }`}>
+          <div>
+            <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Stato Protocollo</span>
+            <span className="font-bold font-mono">{String(data.mode || 'N/A')}</span>
+          </div>
+          <Badge variant="outline" className={isDual ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40'}>
+            {isDual ? 'Dual-Stack OK' : 'Legacy IPv4'}
+          </Badge>
+        </div>
+
+        <div className="space-y-1.5 font-mono text-[11px]">
+          {ipv4List.length > 0 && (
+            <div>
+              <span className="text-[10px] text-zinc-500 block">Indirizzi IPv4 (A):</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {ipv4List.map((ip, i) => (
+                  <Badge key={i} variant="outline" className="bg-zinc-950 border-zinc-800 text-blue-300">
+                    {ip}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ipv6List.length > 0 ? (
+            <div>
+              <span className="text-[10px] text-zinc-500 block">Indirizzi IPv6 (AAAA):</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {ipv6List.map((ip, i) => (
+                  <Badge key={i} variant="outline" className="bg-purple-950/40 border-purple-800 text-purple-300 break-all text-[10px]">
+                    {ip}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-[11px] text-zinc-500 italic pt-1">
+              Nessun record IPv6 presente.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Vulnerability: Exposed Sensitive Files
   if ('exposedFiles' in data && Array.isArray(data.exposedFiles)) {
     const exposed = data.exposedFiles as ExposedFile[];
     return (
@@ -87,7 +189,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 2. Vulnerability: Cookie Security Flags
+  // 4. Vulnerability: Cookie Security Flags
   if ('cookies' in data && Array.isArray(data.cookies)) {
     const cookies = data.cookies as CookieItem[];
     return (
@@ -133,7 +235,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 3. Vulnerability: WAF & Shield Detection
+  // 5. Vulnerability: WAF & Shield Detection
   if ('detectedShields' in data && Array.isArray(data.detectedShields)) {
     const shields = data.detectedShields as ShieldItem[];
     return (
@@ -164,7 +266,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 4. Vulnerability: CORS Audit
+  // 6. Vulnerability: CORS Audit
   if ('allowOrigin' in data || 'riskLevel' in data) {
     return (
       <div className="space-y-2 text-xs font-mono">
@@ -187,7 +289,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 5. DNS Records
+  // 7. DNS Records
   if ('a' in data || 'mx' in data || 'txt' in data) {
     const aRecords = Array.isArray(data.a) ? (data.a as string[]) : [];
     const aaaaRecords = Array.isArray(data.aaaa) ? (data.aaaa as string[]) : [];
@@ -269,7 +371,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 6. Port Scanner
+  // 8. Port Scanner
   if (Array.isArray(data.ports)) {
     const portLabels: Record<number, string> = {
       80: 'HTTP',
@@ -318,7 +420,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 7. Ping / Latency
+  // 9. Ping / Latency
   if ('latency' in data) {
     const latencyNum = typeof data.latency === 'number' ? data.latency : parseInt(String(data.latency), 10);
     const latencyQuality = latencyNum < 50 ? 'Eccellente' : latencyNum < 150 ? 'Buona' : 'Elevata';
@@ -348,7 +450,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 8. SSL Certificate
+  // 10. SSL Certificate
   if ('valid_to' in data || 'issuer' in data || 'days_remaining' in data) {
     const isOk = data.is_valid !== false;
     const days = typeof data.days_remaining === 'number' ? data.days_remaining : undefined;
@@ -389,7 +491,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 9. WHOIS
+  // 11. WHOIS
   if ('registrar' in data || 'nameservers' in data) {
     const nsList = Array.isArray(data.nameservers) ? (data.nameservers as string[]) : [];
 
@@ -421,7 +523,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 10. Public IP / ISP
+  // 12. Public IP / ISP
   if ('ip' in data && ('city' in data || 'org' in data)) {
     return (
       <div className="space-y-2.5 text-xs">
@@ -439,25 +541,6 @@ export function ResultRenderer({ result }: ResultRendererProps) {
             <span className="font-medium truncate block">{String(data.org || data.asn || '-')}</span>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // 11. General Security Check Fallback
-  if ('message' in data || 'recommendation' in data) {
-    return (
-      <div className="space-y-2 text-xs">
-        {Boolean(data.message) && (
-          <p className="text-zinc-300 leading-relaxed font-medium bg-zinc-950/50 p-2.5 rounded-lg border border-zinc-800/80">
-            {String(data.message)}
-          </p>
-        )}
-        {Boolean(data.recommendation) && (
-          <div className="text-[11px] text-zinc-400 bg-blue-950/20 border border-blue-800/30 p-2 rounded">
-            <span className="text-blue-400 font-semibold block mb-0.5">Suggerimento:</span>
-            {String(data.recommendation)}
-          </div>
-        )}
       </div>
     );
   }

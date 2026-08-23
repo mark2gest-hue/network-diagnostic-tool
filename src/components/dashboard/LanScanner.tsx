@@ -65,6 +65,29 @@ export function LanScanner() {
     }
   };
 
+  const exportToCsv = () => {
+    if (!data || !data.devices.length) return;
+    const headers = ['IP', 'MAC Address', 'Ruolo', 'Gateway', 'Dispositivo Locale', 'Porte Aperte', 'Latenza (ms)'];
+    const rows = data.devices.map(d => [
+      d.ip,
+      d.mac,
+      `"${d.role}"`,
+      d.isGateway ? 'SI' : 'NO',
+      d.isSelf ? 'SI' : 'NO',
+      `"${d.openPorts.join(', ') || 'Nessuna'}"`,
+      d.latency ?? 0
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wifi_lan_devices_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const getDeviceIcon = (device: DiscoveredDevice) => {
     if (device.isGateway) return Router;
     if (device.isSelf) return Laptop;
@@ -91,23 +114,34 @@ export function LanScanner() {
           </p>
         </div>
 
-        <Button
-          onClick={runScan}
-          disabled={loading}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold px-5 py-5 rounded-xl shadow-lg shadow-emerald-600/20 border border-emerald-400/20 transition-all shrink-0"
-        >
-          {loading ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Scansione Subnet in corso...
-            </>
-          ) : (
-            <>
-              <Search className="w-4 h-4 mr-2" />
-              {data ? 'Ripeti Scansione WiFi' : 'Avvia Scansione WiFi'}
-            </>
+        <div className="flex gap-2">
+          {data && data.devices.length > 0 && (
+            <Button
+              onClick={exportToCsv}
+              variant="outline"
+              className="border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 font-semibold px-4 py-5 rounded-xl transition-all shrink-0 text-xs"
+            >
+              Esporta CSV
+            </Button>
           )}
-        </Button>
+          <Button
+            onClick={runScan}
+            disabled={loading}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold px-5 py-5 rounded-xl shadow-lg shadow-emerald-600/20 border border-emerald-400/20 transition-all shrink-0"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Scansione Subnet...
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4 mr-2" />
+                {data ? 'Ripeti Scansione' : 'Avvia Scansione WiFi'}
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -12,6 +12,8 @@ export function useExternalTests() {
     ssl: null,
     http: null,
     rbl: null,
+    traceroute: null,
+    ipv6: null,
   });
 
   const [loading, setLoading] = useState<Record<ExternalTestType, boolean>>({
@@ -22,6 +24,8 @@ export function useExternalTests() {
     ssl: false,
     http: false,
     rbl: false,
+    traceroute: false,
+    ipv6: false,
   });
 
   const updateResult = (type: ExternalTestType, result: Partial<TestResult>) => {
@@ -44,12 +48,12 @@ export function useExternalTests() {
     updateResult(type, { status: 'running' });
 
     try {
-      const paramName = type === 'rbl' ? 'ip' : (['dns', 'whois', 'ssl'].includes(type) ? 'domain' : 'target');
+      const paramName = type === 'rbl' ? 'ip' : (['dns', 'whois', 'ssl', 'ipv6'].includes(type) ? 'domain' : 'target');
       const res = await fetch(`/api/tests/${type}?${paramName}=${encodeURIComponent(target)}`);
       const data = await res.json();
 
       if (res.ok) {
-        updateResult(type, { status: 'pass', result: data });
+        updateResult(type, { status: data.status || 'pass', result: data });
       } else {
         updateResult(type, { status: 'fail', error: data.error });
       }
@@ -65,7 +69,7 @@ export function useExternalTests() {
     loading,
     runTest,
     runAll: async (target: string) => {
-      const tests: ExternalTestType[] = ['dns', 'whois', 'ping', 'portscan', 'ssl', 'http'];
+      const tests: ExternalTestType[] = ['dns', 'whois', 'ping', 'portscan', 'ssl', 'http', 'traceroute', 'ipv6'];
       for (const t of tests) {
         await runTest(t, target);
       }

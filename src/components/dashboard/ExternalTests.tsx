@@ -5,7 +5,19 @@ import { useExternalTests } from '@/hooks/useExternalTests';
 import { TestCard } from './TestCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Play, Globe, Search, RefreshCw, Server, Lock, Activity, Hash, ArrowUpRight } from 'lucide-react';
+import { 
+  Play, 
+  Globe, 
+  Search, 
+  RefreshCw, 
+  Server, 
+  Lock, 
+  Activity, 
+  Hash, 
+  ArrowUpRight,
+  GitCommit,
+  Network
+} from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { ExportButton } from '../ExportButton';
 
@@ -16,8 +28,8 @@ export function ExternalTests() {
   const { results, loading, runTest, runAll } = useExternalTests();
 
   const activeCount = Object.values(loading).filter(Boolean).length;
-  const finishedCount = Object.values(results).filter(r => r !== null && r.status !== 'running').length;
-  const totalTests = 6;
+  const finishedCount = Object.values(results).filter(r => r !== null && r.status !== 'running' && r.status !== 'idle').length;
+  const totalTests = 8;
   const progress = (finishedCount / totalTests) * 100;
 
   return (
@@ -32,7 +44,7 @@ export function ExternalTests() {
             External Network Diagnostics
           </h2>
           <p className="text-sm text-zinc-400">
-            Analisi server-side profonda di risoluzione DNS, crittografia SSL, disponibilità porte e latenza.
+            Analisi server-side profonda di risoluzione DNS, crittografia SSL, traceroute hop, IPv6 e disponibilità porte.
           </p>
         </div>
 
@@ -96,8 +108,8 @@ export function ExternalTests() {
         </div>
       )}
 
-      {/* Test Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      {/* Test Cards Grid (8 Cards) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         <TestCard 
           title="DNS Lookup"
           description="Risoluzione record A, AAAA, MX, TXT"
@@ -105,6 +117,22 @@ export function ExternalTests() {
           test={results.dns}
           loading={loading.dns}
           onRun={() => runTest('dns', target)}
+        />
+        <TestCard 
+          title="Traceroute Visivo"
+          description="Tracciamento nodi hop e latenza per tratta"
+          icon={GitCommit}
+          test={results.traceroute}
+          loading={loading.traceroute}
+          onRun={() => runTest('traceroute', target)}
+        />
+        <TestCard 
+          title="IPv6 & Dual-Stack"
+          description="Supporto AAAA e fallback RFC 8305"
+          icon={Network}
+          test={results.ipv6}
+          loading={loading.ipv6}
+          onRun={() => runTest('ipv6', target)}
         />
         <TestCard 
           title="Ping / Latenza"

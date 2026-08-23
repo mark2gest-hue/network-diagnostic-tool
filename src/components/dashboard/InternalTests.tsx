@@ -3,6 +3,7 @@
 import { useInternalTests } from '@/hooks/useInternalTests';
 import { TestCard } from './TestCard';
 import { LanScanner } from './LanScanner';
+import { SpeedtestWidget } from './SpeedtestWidget';
 import { Button } from '@/components/ui/button';
 import { Play, Wifi, RefreshCw, Globe, Network, Zap, Activity, Radio } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -35,7 +36,7 @@ export function InternalTests() {
             <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
               <Wifi className="w-5 h-5" />
             </div>
-            Internal Client Diagnostics
+            Internal Client Diagnostics & Speedtest
           </h2>
           <p className="text-sm text-zinc-400">
             Diagnostica in tempo reale eseguita direttamente dal tuo browser verso la rete locale e i nodi edge.
@@ -58,6 +59,9 @@ export function InternalTests() {
           </Button>
         </div>
       </div>
+
+      {/* Speedtest Live Gauge Widget */}
+      <SpeedtestWidget />
 
       {/* Progress Bar */}
       {activeCount > 0 && (
