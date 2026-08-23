@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Activity, LogOut, LogIn, History } from 'lucide-react';
+import { Activity, LogOut, LogIn } from 'lucide-react';
 import { User } from '@/types/tests';
 
 export default function Header() {
@@ -25,33 +25,55 @@ export default function Header() {
   };
 
   return (
-    <header className="border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-md sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl text-white">
-          <Activity className="text-blue-500 w-6 h-6" />
-          <span>Network<span className="text-blue-500">Diag</span></span>
+    <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-50 transition-all">
+      <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center gap-2.5 font-black text-xl text-white tracking-tight group">
+          <div className="p-2 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+            <Activity className="w-5 h-5" />
+          </div>
+          <span className="flex items-center">
+            Network<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Diag</span>
+          </span>
+          <span className="hidden sm:inline-block ml-2 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            Ops Pro
+          </span>
         </Link>
 
-        <nav className="flex items-center gap-4">
+        {/* Live Status indicator & Navigation */}
+        <nav className="flex items-center gap-3 sm:gap-4">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="font-mono text-[11px]">Engine Online</span>
+          </div>
+
           {user ? (
-            <>
-              <div className="hidden md:flex flex-col items-end">
-                <span className="text-xs text-zinc-500">Accesso come</span>
-                <span className="text-sm font-medium text-zinc-200">{user.email}</span>
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">Account</span>
+                <span className="text-xs font-mono font-medium text-zinc-200">{user.email}</span>
               </div>
-              <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white" title="History">
-                <History className="w-5 h-5" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleLogout} 
+                className="border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 rounded-xl transition-all"
+              >
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Esci</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout} className="border-zinc-800 hover:bg-zinc-900 border-zinc-700">
-                <LogOut className="w-4 h-4 mr-2" />
-                Scollegati
-              </Button>
-            </>
+            </div>
           ) : (
             <Link href="/login">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white border-none">
+              <Button 
+                size="sm" 
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 border border-blue-400/20 px-4 transition-all"
+              >
                 <LogIn className="w-4 h-4 mr-2" />
-                Accedi
+                Accedi / Registrati
               </Button>
             </Link>
           )}
