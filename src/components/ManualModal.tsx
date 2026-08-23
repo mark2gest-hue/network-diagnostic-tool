@@ -148,19 +148,25 @@ export function ManualModal() {
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in"
+          onClick={() => setIsOpen(false)}
+        >
+          <div 
+            className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-5xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
-            <div className="p-4 sm:p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/70 shrink-0">
+            <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/80 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
                   <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  <h2 className="text-base font-bold text-white tracking-tight">
                     Manuale Operativo & Guida alle Configurazioni
                   </h2>
-                  <p className="text-[11px] sm:text-xs text-zinc-400">
+                  <p className="text-[11px] text-zinc-400">
                     Cosa verificare, interpretazione delle metriche e checklist di hardening.
                   </p>
                 </div>
@@ -170,7 +176,7 @@ export function ManualModal() {
                 <Button
                   onClick={downloadPdfManual}
                   size="sm"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold rounded-xl px-3 h-8 sm:h-9"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold rounded-xl px-3 h-8"
                 >
                   <Download className="w-3.5 h-3.5 mr-1.5" />
                   Scarica PDF
