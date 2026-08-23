@@ -5,6 +5,7 @@ import { ExternalTests } from '@/components/dashboard/ExternalTests';
 import { InternalTests } from '@/components/dashboard/InternalTests';
 import { SecurityAudit } from '@/components/dashboard/SecurityAudit';
 import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Globe, Wifi, ShieldCheck, Flame, Zap } from 'lucide-react';
 
 type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities';
@@ -85,7 +86,7 @@ export default function Dashboard() {
               onClick={() => setActiveTab('vulnerabilities')}
               className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
                 activeTab === 'vulnerabilities'
-                  ? 'bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 text-white shadow-lg shadow-red-600/25 border border-red-400/30 animate-in fade-in'
+                  ? 'bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 text-white shadow-lg shadow-red-600/25 border border-red-400/30'
                   : 'text-red-400/80 hover:text-red-300 hover:bg-red-950/30'
               }`}
             >
@@ -95,29 +96,37 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tab Content Panels */}
+        {/* Tab Content Panels wrapped with Error Boundary */}
         <div className="space-y-4">
           {activeTab === 'external' && (
             <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300">
-              <ExternalTests />
+              <ErrorBoundary fallbackTitle="Errore nella sezione External Tests">
+                <ExternalTests />
+              </ErrorBoundary>
             </div>
           )}
 
           {activeTab === 'internal' && (
             <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300">
-              <InternalTests />
+              <ErrorBoundary fallbackTitle="Errore nella sezione Internal / WiFi">
+                <InternalTests />
+              </ErrorBoundary>
             </div>
           )}
 
           {activeTab === 'security' && (
             <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300">
-              <SecurityAudit />
+              <ErrorBoundary fallbackTitle="Errore nella sezione Security Audit">
+                <SecurityAudit />
+              </ErrorBoundary>
             </div>
           )}
 
           {activeTab === 'vulnerabilities' && (
             <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300 border-red-500/20">
-              <VulnerabilityScan />
+              <ErrorBoundary fallbackTitle="Errore nella sezione Vulnerability Scanner">
+                <VulnerabilityScan />
+              </ErrorBoundary>
             </div>
           )}
         </div>
@@ -129,7 +138,7 @@ export default function Dashboard() {
             <span>Network Diagnostic & Vulnerability Operations Center</span>
           </div>
           <div>
-            &copy; {new Date().getFullYear()} NetworkDiag Tool &bull; Powered by LibSQL & Edge Next.js
+            &copy; 2026 NetworkDiag Tool &bull; Powered by LibSQL & Edge Next.js
           </div>
         </footer>
       </div>

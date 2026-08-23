@@ -109,10 +109,14 @@ export function TestCard({ test, loading, onRun, title, description, icon: Custo
         )}
       </div>
 
-      {test && test.timestamp && (
+      {test && Boolean(test.timestamp) && (
         <div className="px-4 py-2 bg-zinc-950/40 border-t border-zinc-800/40 text-[10px] text-zinc-500 font-mono flex justify-between items-center">
           <span>Ultimo test:</span>
-          <span>{new Date(test.timestamp).toLocaleTimeString()}</span>
+          <span>
+            {typeof test.timestamp === 'number' && !isNaN(test.timestamp)
+              ? new Date(test.timestamp).toLocaleTimeString()
+              : '--:--:--'}
+          </span>
         </div>
       )}
     </Card>
