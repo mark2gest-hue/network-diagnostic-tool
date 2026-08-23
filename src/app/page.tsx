@@ -5,10 +5,11 @@ import { ExternalTests } from '@/components/dashboard/ExternalTests';
 import { InternalTests } from '@/components/dashboard/InternalTests';
 import { SecurityAudit } from '@/components/dashboard/SecurityAudit';
 import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
+import { ManualSection } from '@/components/dashboard/ManualSection';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Globe, Wifi, ShieldCheck, Flame, Zap } from 'lucide-react';
+import { Globe, Wifi, ShieldCheck, Flame, BookOpen, Zap } from 'lucide-react';
 
-type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities';
+type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities' | 'manual';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('external');
@@ -93,6 +94,19 @@ export default function Dashboard() {
               <Flame className="w-4 h-4 text-red-400" />
               Vulnerability Scanner
             </button>
+
+            <button 
+              type="button"
+              onClick={() => setActiveTab('manual')}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+                activeTab === 'manual'
+                  ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-lg shadow-emerald-600/25 border border-emerald-400/30'
+                  : 'text-emerald-400/90 hover:text-emerald-300 hover:bg-emerald-950/30'
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-emerald-400" />
+              Manuale & Guida
+            </button>
           </div>
         </div>
 
@@ -126,6 +140,14 @@ export default function Dashboard() {
             <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300 border-red-500/20">
               <ErrorBoundary fallbackTitle="Errore nella sezione Vulnerability Scanner">
                 <VulnerabilityScan />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {activeTab === 'manual' && (
+            <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300 border-emerald-500/20">
+              <ErrorBoundary fallbackTitle="Errore nella sezione Manuale & Guida">
+                <ManualSection />
               </ErrorBoundary>
             </div>
           )}
