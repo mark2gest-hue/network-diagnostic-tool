@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
 import { verifyPassword, signJwt } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -12,13 +12,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing email or password' }, { status: 400 });
     }
 
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const result = await db.execute({
+      sql: 'SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1',
+      args: [email.toLowerCase().trim()]
+    });
 
-    if (error || !user) {
+    const user = result.rows[0] as unknown as { id: string; email: string; password_hash: string } | undefined;
+
+    if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
