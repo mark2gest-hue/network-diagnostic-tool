@@ -6,8 +6,10 @@ import {
   Clock, 
   Server, 
   Lock, 
-  Layers,
-  FileCode
+  Layers, 
+  FileCode, 
+  CheckCircle2, 
+  Cookie 
 } from 'lucide-react';
 
 interface ResultRendererProps {
@@ -20,9 +22,25 @@ interface MxRecord {
   priority?: number;
 }
 
-interface ExposedPath {
+interface ExposedFile {
   path?: string;
-  status?: string;
+  label?: string;
+  risk?: string;
+  detail?: string;
+}
+
+interface CookieItem {
+  name: string;
+  isHttpOnly: boolean;
+  isSecure: boolean;
+  sameSite: string;
+  issues: string[];
+  safe: boolean;
+}
+
+interface ShieldItem {
+  name: string;
+  vendor: string;
 }
 
 export function ResultRenderer({ result }: ResultRendererProps) {
@@ -32,7 +50,144 @@ export function ResultRenderer({ result }: ResultRendererProps) {
 
   const data = result as Record<string, unknown>;
 
-  // 1. DNS Records
+  // 1. Vulnerability: Exposed Sensitive Files
+  if ('exposedFiles' in data && Array.isArray(data.exposedFiles)) {
+    const exposed = data.exposedFiles as ExposedFile[];
+    return (
+      <div className="space-y-2.5 text-xs">
+        {exposed.length === 0 ? (
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Nessun file critico esposto (.env, .git, backup).</span>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-red-400 uppercase font-bold tracking-wider block">
+              File Rilevati ({exposed.length}):
+            </span>
+            {exposed.map((file, i) => (
+              <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-red-950/20 border border-red-500/30 font-mono">
+                <div className="flex flex-col">
+                  <span className="font-bold text-red-300">{file.path}</span>
+                  <span className="text-[10px] text-zinc-400">{file.detail || file.label}</span>
+                </div>
+                <Badge variant="outline" className="text-[9px] uppercase bg-red-500/20 border-red-500/50 text-red-300">
+                  {file.risk || 'High'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+        {Boolean(data.recommendation) && (
+          <p className="text-[11px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80">
+            {String(data.recommendation)}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // 2. Vulnerability: Cookie Security Flags
+  if ('cookies' in data && Array.isArray(data.cookies)) {
+    const cookies = data.cookies as CookieItem[];
+    return (
+      <div className="space-y-2.5 text-xs">
+        {cookies.length === 0 ? (
+          <div className="text-zinc-400 p-2 rounded bg-zinc-950/40 border border-zinc-800">
+            Nessun cookie restituito dall&apos;endpoint analizzato.
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+            {cookies.map((c, i) => (
+              <div key={i} className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800 space-y-1">
+                <div className="flex items-center justify-between font-mono">
+                  <span className="font-bold text-zinc-200 flex items-center gap-1.5">
+                    <Cookie className="w-3.5 h-3.5 text-amber-400" />
+                    {c.name}
+                  </span>
+                  <Badge variant="outline" className={c.safe ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/40 text-[9px]' : 'bg-amber-950/40 text-amber-400 border-amber-500/40 text-[9px]'}>
+                    {c.safe ? 'Protetto' : 'Incompleto'}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  <span className={`px-1.5 py-0.5 rounded ${c.isHttpOnly ? 'bg-emerald-950/60 text-emerald-300' : 'bg-red-950/60 text-red-400'}`}>
+                    HttpOnly: {c.isHttpOnly ? 'Sì' : 'No'}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded ${c.isSecure ? 'bg-emerald-950/60 text-emerald-300' : 'bg-red-950/60 text-red-400'}`}>
+                    Secure: {c.isSecure ? 'Sì' : 'No'}
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400">
+                    SameSite: {c.sameSite}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {Boolean(data.recommendation) && (
+          <p className="text-[11px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80">
+            {String(data.recommendation)}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // 3. Vulnerability: WAF & Shield Detection
+  if ('detectedShields' in data && Array.isArray(data.detectedShields)) {
+    const shields = data.detectedShields as ShieldItem[];
+    return (
+      <div className="space-y-2.5 text-xs">
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950/60 border border-zinc-800">
+          <span className="text-zinc-400">Protezione WAF:</span>
+          {shields.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {shields.map((s, i) => (
+                <Badge key={i} variant="outline" className="bg-purple-950/40 border-purple-500/40 text-purple-300">
+                  {s.name}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <Badge variant="outline" className="bg-amber-950/40 border-amber-500/40 text-amber-400">
+              Nessun WAF Rilevato
+            </Badge>
+          )}
+        </div>
+        {Boolean(data.serverHeader) && (
+          <div className="flex justify-between text-[11px] text-zinc-400 font-mono px-1">
+            <span>Server Banner:</span>
+            <span className="text-zinc-300">{String(data.serverHeader)}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 4. Vulnerability: CORS Audit
+  if ('allowOrigin' in data || 'riskLevel' in data) {
+    return (
+      <div className="space-y-2 text-xs font-mono">
+        <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800 space-y-1">
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Allow-Origin:</span>
+            <span className="text-zinc-200">{String(data.allowOrigin)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Allow-Credentials:</span>
+            <span className="text-zinc-200">{String(data.allowCredentials)}</span>
+          </div>
+        </div>
+        {Boolean(data.message) && (
+          <p className="text-[11px] font-sans text-zinc-300 leading-relaxed">
+            {String(data.message)}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // 5. DNS Records
   if ('a' in data || 'mx' in data || 'txt' in data) {
     const aRecords = Array.isArray(data.a) ? (data.a as string[]) : [];
     const aaaaRecords = Array.isArray(data.aaaa) ? (data.aaaa as string[]) : [];
@@ -114,7 +269,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 2. Port Scanner
+  // 6. Port Scanner
   if (Array.isArray(data.ports)) {
     const portLabels: Record<number, string> = {
       80: 'HTTP',
@@ -163,7 +318,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 3. Ping / Latency
+  // 7. Ping / Latency
   if ('latency' in data) {
     const latencyNum = typeof data.latency === 'number' ? data.latency : parseInt(String(data.latency), 10);
     const latencyQuality = latencyNum < 50 ? 'Eccellente' : latencyNum < 150 ? 'Buona' : 'Elevata';
@@ -193,7 +348,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 4. SSL Certificate
+  // 8. SSL Certificate
   if ('valid_to' in data || 'issuer' in data || 'days_remaining' in data) {
     const isOk = data.is_valid !== false;
     const days = typeof data.days_remaining === 'number' ? data.days_remaining : undefined;
@@ -234,7 +389,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 5. WHOIS
+  // 9. WHOIS
   if ('registrar' in data || 'nameservers' in data) {
     const nsList = Array.isArray(data.nameservers) ? (data.nameservers as string[]) : [];
 
@@ -266,7 +421,7 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 6. Public IP / ISP
+  // 10. Public IP / ISP
   if ('ip' in data && ('city' in data || 'org' in data)) {
     return (
       <div className="space-y-2.5 text-xs">
@@ -288,81 +443,14 @@ export function ResultRenderer({ result }: ResultRendererProps) {
     );
   }
 
-  // 7. WiFi & Network Quality API
-  if ('downlink' in data || 'effectiveType' in data) {
-    return (
-      <div className="space-y-2 text-xs">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="p-2.5 rounded-lg bg-zinc-950/60 border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 uppercase block">Banda Stimata</span>
-            <span className="text-lg font-bold font-mono text-blue-400">{String(data.downlink)}</span>
-          </div>
-          <div className="p-2.5 rounded-lg bg-zinc-950/60 border border-zinc-800">
-            <span className="text-[10px] text-zinc-500 uppercase block">Latenza RTT</span>
-            <span className="text-lg font-bold font-mono text-emerald-400">{String(data.rtt)}</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between text-zinc-400 pt-1">
-          <span>Tipo Rete:</span>
-          <Badge variant="outline" className="uppercase font-mono bg-zinc-900 border-zinc-700">
-            {String(data.effectiveType || data.type || 'Sconosciuto')}
-          </Badge>
-        </div>
-      </div>
-    );
-  }
-
-  // 8. Packet Loss
-  if ('loss' in data) {
-    const isZero = data.loss === '0%';
-    return (
-      <div className="space-y-2.5 text-xs">
-        <div className={`flex items-center justify-between p-3 rounded-xl border ${
-          isZero ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-400' : 'bg-red-950/30 border-red-500/30 text-red-400'
-        }`}>
-          <div>
-            <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">Perdita Pacchetti</span>
-            <span className="text-2xl font-black font-mono tracking-tight">{String(data.loss)}</span>
-          </div>
-          <Badge variant="outline" className={`border-none ${isZero ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'} font-semibold`}>
-            {isZero ? 'Nessuna Perdita' : 'Pacchetti Persi'}
-          </Badge>
-        </div>
-        <div className="flex justify-between text-[11px] text-zinc-500 font-mono px-1">
-          <span>Trasmessi: {String(data.transmitted)}</span>
-          <span>Ricevuti: {String(data.received)}</span>
-        </div>
-      </div>
-    );
-  }
-
-  // 9. Security Audit Checks
-  if ('message' in data || 'recommendation' in data || 'details' in data || 'exposedPaths' in data) {
-    const exposedList = Array.isArray(data.exposedPaths) ? (data.exposedPaths as (ExposedPath | string)[]) : [];
-
+  // 11. General Security Check Fallback
+  if ('message' in data || 'recommendation' in data) {
     return (
       <div className="space-y-2 text-xs">
         {Boolean(data.message) && (
           <p className="text-zinc-300 leading-relaxed font-medium bg-zinc-950/50 p-2.5 rounded-lg border border-zinc-800/80">
             {String(data.message)}
           </p>
-        )}
-        {exposedList.length > 0 && (
-          <div>
-            <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block mb-1">
-              Percorsi Rilevati:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {exposedList.map((p, i) => {
-                const pathStr = typeof p === 'object' && p ? p.path : String(p);
-                return (
-                  <Badge key={i} variant="outline" className="bg-amber-950/40 border-amber-600/60 text-amber-300 font-mono">
-                    {pathStr}
-                  </Badge>
-                );
-              })}
-            </div>
-          </div>
         )}
         {Boolean(data.recommendation) && (
           <div className="text-[11px] text-zinc-400 bg-blue-950/20 border border-blue-800/30 p-2 rounded">

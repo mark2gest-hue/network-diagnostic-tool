@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { ExternalTests } from '@/components/dashboard/ExternalTests';
 import { InternalTests } from '@/components/dashboard/InternalTests';
 import { SecurityAudit } from '@/components/dashboard/SecurityAudit';
-import { Globe, Wifi, ShieldCheck, Zap } from 'lucide-react';
+import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
+import { Globe, Wifi, ShieldCheck, Flame, Zap } from 'lucide-react';
 
-type TabType = 'external' | 'internal' | 'security';
+type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('external');
@@ -14,8 +15,8 @@ export default function Dashboard() {
   return (
     <div className="relative min-h-screen pb-16 overflow-hidden">
       {/* Background Ambient Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-blue-600/15 via-purple-600/10 to-transparent blur-3xl pointer-events-none -z-10" />
-      <div className="absolute top-48 right-10 w-[400px] h-[300px] bg-emerald-600/10 blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[350px] bg-gradient-to-b from-blue-600/15 via-purple-600/10 to-transparent blur-3xl pointer-events-none -z-10" />
+      <div className="absolute top-48 right-10 w-[400px] h-[300px] bg-red-600/10 blur-3xl pointer-events-none -z-10" />
 
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-7xl">
         {/* Main Hero Header */}
@@ -27,13 +28,13 @@ export default function Dashboard() {
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white max-w-4xl leading-tight">
             Diagnostica di Rete & <br className="hidden sm:inline" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400">
-              Security Compliance
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-red-400">
+              Vulnerability Assessment
             </span>
           </h1>
 
           <p className="text-zinc-400 max-w-2xl text-base sm:text-lg leading-relaxed">
-            Monitora latenza, DNS, porte aperte e postura crittografica con test server-side ad alte prestazioni e diagnostica browser in tempo reale.
+            Monitora latenza, DNS, posture crittografica e scansiona falle di sicurezza, file esposti (.env, .git) e misconfigurazioni CORS/Cookie.
           </p>
         </div>
 
@@ -43,7 +44,7 @@ export default function Dashboard() {
             <button 
               type="button"
               onClick={() => setActiveTab('external')}
-              className={`px-5 sm:px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
                 activeTab === 'external'
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border border-blue-400/30'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -56,7 +57,7 @@ export default function Dashboard() {
             <button 
               type="button"
               onClick={() => setActiveTab('internal')}
-              className={`px-5 sm:px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
                 activeTab === 'internal'
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/25 border border-emerald-400/30'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -69,7 +70,7 @@ export default function Dashboard() {
             <button 
               type="button"
               onClick={() => setActiveTab('security')}
-              className={`px-5 sm:px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
                 activeTab === 'security'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/25 border border-purple-400/30'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -77,6 +78,19 @@ export default function Dashboard() {
             >
               <ShieldCheck className="w-4 h-4" />
               Security Audit
+            </button>
+
+            <button 
+              type="button"
+              onClick={() => setActiveTab('vulnerabilities')}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+                activeTab === 'vulnerabilities'
+                  ? 'bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 text-white shadow-lg shadow-red-600/25 border border-red-400/30 animate-in fade-in'
+                  : 'text-red-400/80 hover:text-red-300 hover:bg-red-950/30'
+              }`}
+            >
+              <Flame className="w-4 h-4 text-red-400" />
+              Vulnerability Scanner
             </button>
           </div>
         </div>
@@ -100,13 +114,19 @@ export default function Dashboard() {
               <SecurityAudit />
             </div>
           )}
+
+          {activeTab === 'vulnerabilities' && (
+            <div className="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl animate-in fade-in duration-300 border-red-500/20">
+              <VulnerabilityScan />
+            </div>
+          )}
         </div>
         
         {/* Footer */}
         <footer className="mt-20 pt-8 border-t border-zinc-800/60 flex flex-col sm:flex-row items-center justify-between text-zinc-500 text-xs gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>Network Diagnostic & Security Operations Center</span>
+            <div className="w-2 h-2 rounded-full bg-red-500" />
+            <span>Network Diagnostic & Vulnerability Operations Center</span>
           </div>
           <div>
             &copy; {new Date().getFullYear()} NetworkDiag Tool &bull; Powered by LibSQL & Edge Next.js
