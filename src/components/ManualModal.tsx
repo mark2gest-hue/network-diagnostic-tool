@@ -8,7 +8,11 @@ import {
   Shield, 
   Globe, 
   Wifi, 
-  Terminal
+  Terminal,
+  Server,
+  Zap,
+  Lock,
+  FileCode
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
@@ -16,14 +20,14 @@ import autoTable from 'jspdf-autotable';
 
 export function ManualModal() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'external' | 'lan' | 'vulnerabilities' | 'vps' | 'turso'>('external');
+  const [activeTab, setActiveTab] = useState<'external' | 'lan' | 'vulnerabilities' | 'vps'>('external');
 
   const downloadPdfManual = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
 
     // Header / Copertina
-    doc.setFillColor(15, 23, 42); // Dark Slate #0f172a
+    doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, pageWidth, 45, 'F');
 
     doc.setTextColor(255, 255, 255);
@@ -144,20 +148,20 @@ export function ManualModal() {
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95">
             {/* Modal Header */}
-            <div className="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+            <div className="p-4 sm:p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/70 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
-                  <BookOpen className="w-6 h-6" />
+                <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
+                  <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white tracking-tight">
+                  <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
                     Manuale Operativo & Guida alle Configurazioni
                   </h2>
-                  <p className="text-xs text-zinc-400">
-                    Documentazione completa su cosa verificare, interpretazione delle metriche e hardening VPS.
+                  <p className="text-[11px] sm:text-xs text-zinc-400">
+                    Cosa verificare, interpretazione delle metriche e checklist di hardening.
                   </p>
                 </div>
               </div>
@@ -166,179 +170,293 @@ export function ManualModal() {
                 <Button
                   onClick={downloadPdfManual}
                   size="sm"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold rounded-xl px-3.5 h-9"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold rounded-xl px-3 h-8 sm:h-9"
                 >
                   <Download className="w-3.5 h-3.5 mr-1.5" />
                   Scarica PDF
                 </Button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                  className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex gap-2 p-3 bg-zinc-900/80 border-b border-zinc-800 overflow-x-auto text-xs">
+            {/* Navigation Tabs Bar */}
+            <div className="flex gap-2 p-2.5 bg-zinc-900/90 border-b border-zinc-800/80 overflow-x-auto text-xs shrink-0">
               <button
                 onClick={() => setActiveTab('external')}
-                className={`px-3.5 py-1.5 rounded-lg font-medium transition-all ${
-                  activeTab === 'external' ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-white'
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'external' ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
                 }`}
               >
+                <Globe className="w-3.5 h-3.5" />
                 1. Diagnostica Esterna
               </button>
               <button
                 onClick={() => setActiveTab('lan')}
-                className={`px-3.5 py-1.5 rounded-lg font-medium transition-all ${
-                  activeTab === 'lan' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-white'
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'lan' ? 'bg-emerald-600 text-white shadow-md' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
                 }`}
               >
-                2. Rete Locale & WiFi/Cavo
+                <Wifi className="w-3.5 h-3.5" />
+                2. Rete Locale (WiFi & Cavo)
               </button>
               <button
                 onClick={() => setActiveTab('vulnerabilities')}
-                className={`px-3.5 py-1.5 rounded-lg font-medium transition-all ${
-                  activeTab === 'vulnerabilities' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'vulnerabilities' ? 'bg-red-600 text-white shadow-md' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
                 }`}
               >
+                <Shield className="w-3.5 h-3.5" />
                 3. Vulnerability Scanner
               </button>
               <button
                 onClick={() => setActiveTab('vps')}
-                className={`px-3.5 py-1.5 rounded-lg font-medium transition-all ${
-                  activeTab === 'vps' ? 'bg-purple-600 text-white' : 'text-zinc-400 hover:text-white'
+                className={`px-3.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'vps' ? 'bg-purple-600 text-white shadow-md' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
                 }`}
               >
+                <Terminal className="w-3.5 h-3.5" />
                 4. Hardening VPS Linux
               </button>
             </div>
 
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-zinc-300 leading-relaxed">
+            {/* Content Area in 2-Column Horizontal Grid */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               {activeTab === 'external' && (
-                <div className="space-y-4">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-blue-400" />
-                    Cosa verificare nella Diagnostica Esterna:
-                  </h3>
-                  <ul className="space-y-3 text-xs">
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-blue-300 block mb-1">Propagazione DNS Globale (6 Resolver):</strong>
-                      Verifica che Google (8.8.8.8), Cloudflare (1.1.1.1), Quad9 e gli altri restituiscano esattamente gli stessi indirizzi IP. Se vedi discrepanze, il cambio record è ancora in fase di propagazione TTL.
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-cyan-300 block mb-1">Waterfall TTFB (Time to First Byte):</strong>
-                      Misura il tempo impiegato dal backend del server per elaborare la risposta. Sotto i 200ms è ottimale; sopra i 600ms indica che il database o il codice dell&apos;applicazione necessitano di caching o ottimizzazione.
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-purple-300 block mb-1">HTTP/2 e HTTP/3 (QUIC):</strong>
-                      Permettono il multiplexing delle risorse su una singola connessione senza blocchi head-of-line. Abilitarli su Nginx/Cloudflare migliora i punteggi Google PageSpeed.
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-emerald-300 block mb-1">Certificato SSL e Port Scanner:</strong>
-                      Il certificato deve avere almeno 30 giorni di validità residua. Nel port scanner solo le porte 80 e 443 devono essere accessibili pubblicamente.
-                    </li>
-                  </ul>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                      <Globe className="w-4 h-4" />
+                      <h4>Propagazione DNS Globale (6 Resolver)</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Interroga in parallelo Google (8.8.8.8), Cloudflare (1.1.1.1), Quad9, OpenDNS, AdGuard e Level3.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Cosa guardare:</strong> Tutti i 6 resolver devono restituire gli stessi IP. Se parziale, attendi che il TTL scada.
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs">
+                      <Zap className="w-4 h-4" />
+                      <h4>Waterfall TTFB & Latenza Frazionata</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Scompone in millisecondi DNS, TCP Connect, TLS Handshake e il tempo di calcolo backend (TTFB).
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Soglie:</strong> &lt;200ms Ottimo &bull; 200-600ms Accettabile &bull; &gt;600ms Lento (ottimizzare DB o caching).
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
+                      <Server className="w-4 h-4" />
+                      <h4>Protocolli Moderni: HTTP/2 & HTTP/3 (QUIC)</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Verifica multiplexing su ALPN e trasporto ad alte prestazioni HTTP/3 su UDP/QUIC.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Consiglio:</strong> Abilita HTTP/2 o HTTP/3 su Nginx/Cloudflare per massimizzare la velocita di caricamento.
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                      <Lock className="w-4 h-4" />
+                      <h4>Certificato SSL & Port Scanner</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Validita crittografica, giorni residui e scansione porte esposte (80, 443, 22, 3306, 5432).
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Regola d&apos;oro:</strong> Solo porte 80/443 aperte. SSH e Database devono essere schermati da firewall.
+                    </span>
+                  </div>
                 </div>
               )}
 
               {activeTab === 'lan' && (
-                <div className="space-y-4">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Wifi className="w-4 h-4 text-emerald-400" />
-                    Cosa verificare nella Rete Locale (WiFi & Cavo Ethernet):
-                  </h3>
-                  <ul className="space-y-3 text-xs">
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-emerald-300 block mb-1">Individuazione Scheda di Rete:</strong>
-                      Il motore seleziona in automatico la scheda attiva con cui il computer è connesso (interfaccia WiFi `en0` o Cavo Ethernet `en1`/`eth0`).
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-blue-300 block mb-1">Mappatura Dispositivi (ARP Discovery):</strong>
-                      La tabella mostra tutti gli IP attivi nella subnet (es. 192.168.1.1 - 192.168.1.254), con il MAC address del produttore hardware e l&apos;identificazione del Router/Gateway.
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-purple-300 block mb-1">Esportazione Inventario CSV:</strong>
-                      Puoi cliccare su &quot;Esporta CSV&quot; per scaricare il file formattato e importarlo in Excel per report di audit della rete aziendale o domestica.
-                    </li>
-                  </ul>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                      <Wifi className="w-4 h-4" />
+                      <h4>Individuazione Scheda (WiFi o Cavo Ethernet)</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Il motore seleziona automaticamente la scheda attiva (WiFi `en0` o Cavo Ethernet `en1`/`eth0`).
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Dati mostrati:</strong> Tuo IP locale (es. 192.168.1.7), Subnet (/24) e MAC address della scheda.
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
+                      <Server className="w-4 h-4" />
+                      <h4>Router / Gateway & Pagina di Gestione</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Individua l&apos;IP del router (es. 192.168.1.1) e fornisce il link diretto per aprire la Web UI del modem.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Sicurezza:</strong> Assicurati di aver cambiato la password predefinita admin del router WiFi.
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                      <Globe className="w-4 h-4" />
+                      <h4>Tabella ARP & Mappa Dispositivi Connessi</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Scansiona la subnet locale scoprendo tutti gli host attivi (PC, smartphone, Smart TV, dispositivi IoT).
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Cosa guardare:</strong> Rileva eventuali dispositivi sconosciuti o non autorizzati connessi al tuo WiFi.
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs">
+                      <Download className="w-4 h-4" />
+                      <h4>Esportazione Inventario CSV per Excel</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Con un click sul pulsante &quot;Esporta CSV&quot; puoi scaricare l&apos;inventario completo di tutti i nodi della LAN.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Formato:</strong> File `.csv` compatibile con Microsoft Excel, Apple Numbers e Google Sheets.
+                    </span>
+                  </div>
                 </div>
               )}
 
               {activeTab === 'vulnerabilities' && (
-                <div className="space-y-4">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-red-400" />
-                    Guida al Vulnerability Scanner & Correzioni:
-                  </h3>
-                  <ul className="space-y-3 text-xs">
-                    <li className="p-3 rounded-xl bg-red-950/20 border border-red-500/30">
-                      <strong className="text-red-300 block mb-1">File Sensibili Esposti (.env, .git):</strong>
-                      Blocca subito su Nginx inserendo: <code className="text-amber-300 font-mono">location ~ /\.(env|git) &#123; deny all; &#125;</code> per evitare il furto di credenziali del database.
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-amber-300 block mb-1">Sicurezza Cookie (HttpOnly, Secure, SameSite):</strong>
-                      I cookie di sessione devono contenere sempre <code className="text-zinc-200 font-mono">HttpOnly</code> (impedisce a script XSS di leggerli) e <code className="text-zinc-200 font-mono">Secure</code> (inviati solo via HTTPS).
-                    </li>
-                    <li className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                      <strong className="text-purple-300 block mb-1">Record DNS CAA (RFC 6844):</strong>
-                      Aggiungi un record CAA presso il registrar del dominio (es. <code className="text-zinc-200 font-mono">0 issue &quot;letsencrypt.org&quot;</code>) per vietare l&apos;emissione di certificati SSL da CA non autorizzate.
-                    </li>
-                  </ul>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/30 space-y-1.5">
+                    <div className="flex items-center gap-2 text-red-400 font-bold text-xs">
+                      <Shield className="w-4 h-4" />
+                      <h4>File Sensibili Esposti (.env, .git/HEAD)</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Rischio Critico: Leak delle password del database e delle chiavi segrete JWT.
+                    </p>
+                    <span className="text-[11px] text-zinc-300 block bg-zinc-950/80 p-2 rounded-lg border border-zinc-900 font-mono">
+                      Soluzione Nginx: location ~ /\.(env|git) &#123; deny all; &#125;
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                      <Lock className="w-4 h-4" />
+                      <h4>Sicurezza Cookie (HttpOnly, Secure, SameSite)</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      I cookie di sessione senza HttpOnly sono leggibili da script XSS; senza Secure viaggiano in chiaro su HTTP.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Configurazione:</strong> Imposta `secure: true`, `httpOnly: true` e `sameSite: &quot;lax&quot;`.
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
+                      <FileCode className="w-4 h-4" />
+                      <h4>Autorizzazione DNS CAA (RFC 6844)</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Senza record CAA, qualsiasi Authority pubblica valida puo rilasciare certificati SSL a nome del tuo dominio.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900 font-mono">
+                      Record DNS consigliato: 0 issue &quot;letsencrypt.org&quot;
+                    </span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-1.5">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                      <Zap className="w-4 h-4" />
+                      <h4>Forzatura HTTPS 301 & Scudo WAF</h4>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Tutto il traffico sulla porta 80 deve reindirizzare automaticamente a HTTPS con codice di stato 301 permanente.
+                    </p>
+                    <span className="text-[11px] text-zinc-400 block bg-zinc-950/70 p-2 rounded-lg border border-zinc-900">
+                      <strong>Protezione WAF:</strong> Posizionare Cloudflare o AWS WAF per mitigare bot e DDoS.
+                    </span>
+                  </div>
                 </div>
               )}
 
               {activeTab === 'vps' && (
-                <div className="space-y-4">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-purple-400" />
-                    Hardening Server VPS (Checklist di Sicurezza Linux):
-                  </h3>
-                  <div className="space-y-3 text-xs">
-                    <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1">
-                      <span className="font-bold text-zinc-100 block">1. Configura il Firewall UFW:</span>
-                      <pre className="bg-zinc-950 p-2 rounded text-zinc-300 font-mono text-[11px]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-2">
+                    <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
+                      <Terminal className="w-4 h-4" />
+                      <h4>1. Firewall UFW (Policy Deny Incoming)</h4>
+                    </div>
+                    <pre className="bg-zinc-950 p-2.5 rounded-xl text-zinc-300 font-mono text-[11px] overflow-x-auto border border-zinc-900">
 {`sudo ufw default deny incoming
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw allow 22/tcp
 sudo ufw enable`}
-                      </pre>
-                    </div>
+                    </pre>
+                  </div>
 
-                    <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1">
-                      <span className="font-bold text-zinc-100 block">2. Disabilita Login Password su SSH (/etc/ssh/sshd_config):</span>
-                      <pre className="bg-zinc-950 p-2 rounded text-zinc-300 font-mono text-[11px]">
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-2">
+                    <div className="flex items-center gap-2 text-blue-400 font-bold text-xs">
+                      <Lock className="w-4 h-4" />
+                      <h4>2. SSH Hardening (/etc/ssh/sshd_config)</h4>
+                    </div>
+                    <pre className="bg-zinc-950 p-2.5 rounded-xl text-zinc-300 font-mono text-[11px] overflow-x-auto border border-zinc-900">
 {`PasswordAuthentication no
-PermitRootLogin no`}
-                      </pre>
-                    </div>
+PermitRootLogin no
+PubkeyAuthentication yes`}
+                    </pre>
+                  </div>
 
-                    <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1">
-                      <span className="font-bold text-zinc-100 block">3. Installa Fail2ban per bloccare attacchi Brute-Force:</span>
-                      <pre className="bg-zinc-950 p-2 rounded text-zinc-300 font-mono text-[11px]">
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                      <Shield className="w-4 h-4" />
+                      <h4>3. Protezione Brute-Force (Fail2ban)</h4>
+                    </div>
+                    <pre className="bg-zinc-950 p-2.5 rounded-xl text-zinc-300 font-mono text-[11px] overflow-x-auto border border-zinc-900">
 {`sudo apt install fail2ban -y
 sudo systemctl enable --now fail2ban`}
-                      </pre>
+                    </pre>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/90 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                      <Zap className="w-4 h-4" />
+                      <h4>4. Aggiornamenti Automatici Kernel</h4>
                     </div>
+                    <pre className="bg-zinc-950 p-2.5 rounded-xl text-zinc-300 font-mono text-[11px] overflow-x-auto border border-zinc-900">
+{`sudo apt install unattended-upgrades -y
+sudo dpkg-reconfigure unattended-upgrades`}
+                    </pre>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-zinc-800 bg-zinc-900/50 flex items-center justify-between text-xs text-zinc-500">
+            {/* Modal Footer */}
+            <div className="p-3.5 sm:p-4 border-t border-zinc-800 bg-zinc-900/60 flex items-center justify-between text-xs text-zinc-500 shrink-0">
               <span>Network Diagnostic Ops Pro &bull; Manuale Ufficiale</span>
               <Button
                 onClick={downloadPdfManual}
                 size="sm"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold h-8"
               >
                 <Download className="w-3.5 h-3.5 mr-1.5" />
-                Scarica Manuale Completo in PDF
+                Scarica PDF
               </Button>
             </div>
           </div>
