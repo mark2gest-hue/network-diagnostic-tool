@@ -2,6 +2,7 @@
 
 import { useInternalTests } from '@/hooks/useInternalTests';
 import { TestCard } from './TestCard';
+import { LanScanner } from './LanScanner';
 import { Button } from '@/components/ui/button';
 import { Play, Wifi, RefreshCw, Globe, Network, Zap, Activity, Radio } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -26,7 +27,7 @@ export function InternalTests() {
   const progress = (finishedCount / totalTests) * 100;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header & Controls */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between pb-6 border-b border-zinc-800/80">
         <div className="space-y-1">
@@ -122,6 +123,11 @@ export function InternalTests() {
           loading={loading.packet_loss}
           onRun={runPacketLoss}
         />
+      </div>
+
+      {/* Embedded Live WiFi & LAN Subnet Scanner */}
+      <div className="pt-4 border-t border-zinc-800/80">
+        <LanScanner />
       </div>
     </div>
   );
