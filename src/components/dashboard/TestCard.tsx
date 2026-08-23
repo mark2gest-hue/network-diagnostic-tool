@@ -52,14 +52,25 @@ const statusConfig: Record<TestStatus, { label: string; badgeClass: string; icon
 };
 
 export function TestCard({ test, loading, onRun, title, description, icon: CustomIcon }: TestCardProps) {
-  const currentStatus: TestStatus = loading ? 'running' : (test?.status || 'idle');
-  const config = statusConfig[currentStatus];
-  const StatusIcon = config.icon;
+  let normalizedStatus: TestStatus = 'idle';
+  if (loading) {
+    normalizedStatus = 'running';
+  } else if (test?.status) {
+    const s = String(test.status).toLowerCase();
+    if (['pass', 'success', 'passed', 'propagated', 'ok'].includes(s)) normalizedStatus = 'pass';
+    else if (['warning', 'warn', 'attention'].includes(s)) normalizedStatus = 'warning';
+    else if (['fail', 'failed', 'error'].includes(s)) normalizedStatus = 'fail';
+    else if (['running', 'loading'].includes(s)) normalizedStatus = 'running';
+    else normalizedStatus = 'idle';
+  }
+
+  const config = statusConfig[normalizedStatus] || statusConfig.idle;
+  const StatusIcon = config?.icon || Play;
 
   return (
     <Card className={cn(
       "glass-card border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between",
-      config.glowClass
+      config?.glowClass || ''
     )}>
       <div>
         <CardHeader className="p-4 sm:p-5 flex flex-row items-start justify-between space-y-0 gap-3 border-b border-zinc-800/50 bg-zinc-900/30">
@@ -76,9 +87,9 @@ export function TestCard({ test, loading, onRun, title, description, icon: Custo
           </div>
           
           <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="outline" className={cn('px-2.5 py-0.5 h-6 text-[10px] font-bold uppercase tracking-wider', config.badgeClass)}>
-              <StatusIcon className={cn('mr-1.5 w-3 h-3', currentStatus === 'running' && 'animate-spin')} />
-              {config.label}
+            <Badge variant="outline" className={cn('px-2.5 py-0.5 h-6 text-[10px] font-bold uppercase tracking-wider', config?.badgeClass || '')}>
+              <StatusIcon className={cn('mr-1.5 w-3 h-3', normalizedStatus === 'running' && 'animate-spin')} />
+              {config?.label || 'In Attesa'}
             </Badge>
             <Button 
               variant="ghost" 
@@ -93,7 +104,7 @@ export function TestCard({ test, loading, onRun, title, description, icon: Custo
           </div>
         </CardHeader>
         
-        {test && test.status !== 'idle' && (
+        {test && normalizedStatus !== 'idle' && (
           <CardContent className="p-4 sm:p-5">
             {test.error ? (
               <div className="text-xs text-red-400 font-mono bg-red-950/30 border border-red-800/40 p-3 rounded-xl flex items-start gap-2">
