@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureTables } from '@/lib/db';
 import { hashPassword, signJwt } from '@/lib/auth';
 import crypto from 'crypto';
 
@@ -18,6 +18,9 @@ export async function POST(req: Request) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+
+    // Assicura che le tabelle esistano su Turso
+    await ensureTables();
 
     // Controlla se l'utente esiste già
     const existing = await db.execute({
@@ -51,8 +54,11 @@ export async function POST(req: Request) {
     });
 
     return response;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Errore durante la registrazione' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Errore durante la registrazione';
+    return NextResponse.json({ 
+      error: `Errore database: ${message}. Verifica TURSO_AUTH_TOKEN e TURSO_DATABASE_URL nel file .env.local` 
+    }, { status: 500 });
   }
 }

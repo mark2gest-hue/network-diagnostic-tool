@@ -27,15 +27,20 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data: { error?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        // non-json response
+      }
 
       if (res.ok) {
         window.location.assign('/');
       } else {
-        setError(data.error || (mode === 'login' ? 'Login fallito' : 'Registrazione fallita'));
+        setError(data.error || `Errore HTTP ${res.status}: Impossibile completare l'operazione`);
       }
-    } catch {
-      setError('Si è verificato un errore imprevisto');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Errore di connessione al server');
     } finally {
       setLoading(false);
     }

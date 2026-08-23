@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureTables } from '@/lib/db';
 import { verifyPassword, signJwt } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -9,8 +9,10 @@ export async function POST(req: Request) {
     const { email, password } = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: 'Missing email or password' }, { status: 400 });
+      return NextResponse.json({ error: 'Email e password sono obbligatori' }, { status: 400 });
     }
+
+    await ensureTables();
 
     const result = await db.execute({
       sql: 'SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1',
@@ -20,12 +22,12 @@ export async function POST(req: Request) {
     const user = result.rows[0] as unknown as { id: string; email: string; password_hash: string } | undefined;
 
     if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return NextResponse.json({ error: 'Credenziali non valide' }, { status: 401 });
     }
 
     const isValid = await verifyPassword(password, user.password_hash);
     if (!isValid) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return NextResponse.json({ error: 'Credenziali non valide' }, { status: 401 });
     }
 
     const token = await signJwt({ userId: user.id, email: user.email });
@@ -41,8 +43,9 @@ export async function POST(req: Request) {
     });
 
     return response;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Login error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Errore interno del server';
+    return NextResponse.json({ error: `Errore database: ${message}` }, { status: 500 });
   }
 }
