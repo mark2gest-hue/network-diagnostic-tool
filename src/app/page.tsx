@@ -6,13 +6,109 @@ import { InternalTests } from '@/components/dashboard/InternalTests';
 import { SecurityAudit } from '@/components/dashboard/SecurityAudit';
 import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
 import { ManualSection } from '@/components/dashboard/ManualSection';
+import { RiskScoreWidget } from '@/components/dashboard/RiskScoreWidget';
+import { DemoScenarioSelector } from '@/components/dashboard/DemoScenarioSelector';
+import { AssetInventoryModal } from '@/components/dashboard/AssetInventoryModal';
+import { WebhookManagerModal } from '@/components/dashboard/WebhookManagerModal';
+import { AiRemediationDrawer } from '@/components/dashboard/AiRemediationDrawer';
+import { ScanDiffViewer } from '@/components/dashboard/ScanDiffViewer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Globe, Wifi, ShieldCheck, Flame, BookOpen, Zap } from 'lucide-react';
+import { calculateRiskAssessment } from '@/lib/risk-engine';
+import { RiskAssessment, ScanDiffResult } from '@/types/findings';
+import { DemoScenario, DEMO_SCENARIOS } from '@/lib/demo-scenarios';
+import { Asset } from '@/types/assets';
 
 type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities' | 'manual';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('external');
+  const [currentTarget, setCurrentTarget] = useState<string>('google.com');
+  const [activeScenario, setActiveScenario] = useState<DemoScenario | null>(DEMO_SCENARIOS.ecommerce_drift);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [diffViewerOpen, setDiffViewerOpen] = useState(false);
+  const [assetModalOpen, setAssetModalOpen] = useState(false);
+  const [webhookModalOpen, setWebhookModalOpen] = useState(false);
+
+  // Baseline default risk assessment per scansione live
+  const liveAssessment: RiskAssessment = calculateRiskAssessment([
+    {
+      id: 'sec-hsts-ok',
+      category: 'configuration',
+      severity: 'info',
+      title: 'HSTS Abilitato (Strict-Transport-Security)',
+      description: 'Protezione HTTPS forzata con max-age elevato.',
+      evidence: 'max-age=31536000; includeSubDomains; preload',
+      confidence: 1.0,
+    },
+    {
+      id: 'avail-dns-fast',
+      category: 'availability',
+      severity: 'info',
+      title: 'Risoluzione DNS Globale Ottimale',
+      description: 'Latenza DNS inferiore a 25ms su tutti i resolver principali.',
+      evidence: 'Media: 14ms',
+      confidence: 1.0,
+    },
+    {
+      id: 'sec-no-leak',
+      category: 'security',
+      severity: 'info',
+      title: 'Nessun File Sensibile Esposto',
+      description: 'Verifica completata su .env, .git, backup.sql.',
+      evidence: 'Tutti gli endpoint restituiscono 404 / 403',
+      confidence: 1.0,
+    },
+  ]);
+
+  const activeAssessment = activeScenario ? activeScenario.assessment : liveAssessment;
+  const activeAsset: Asset | null = activeScenario ? activeScenario.asset : null;
+  const activeDiffResult: ScanDiffResult = activeScenario?.diffResult || {
+    target: currentTarget,
+    previousTimestamp: new Date(Date.now() - 86400000).toISOString(),
+    currentTimestamp: new Date().toISOString(),
+    previousScore: 85,
+    currentScore: 98,
+    scoreDelta: 13,
+    previousGrade: 'B',
+    currentGrade: 'A+',
+    changes: [
+      {
+        id: 'sec-hsts-enabled',
+        category: 'configuration',
+        changeType: 'improved',
+        title: 'HSTS Abilitato con successo',
+        previousEvidence: 'Header assente',
+        currentEvidence: 'max-age=31536000; includeSubDomains',
+        severity: 'high',
+        description: 'Il server web ora invia correttamente la direttiva HSTS.',
+      },
+      {
+        id: 'sec-port-closed',
+        category: 'security',
+        changeType: 'removed',
+        title: 'Porta Database 3306 Chiusa',
+        previousEvidence: 'Porta 3306 aperta su IP pubblico',
+        severity: 'critical',
+        description: 'La porta MySQL è stata rimossa dall’interfaccia pubblica tramite regola firewall.',
+      },
+    ],
+    summary: {
+      newVulnerabilities: 0,
+      resolvedVulnerabilities: 1,
+      configDrifts: 1,
+      latencyDeltaMs: -35,
+    },
+  };
+
+  const handleSelectScenario = (scenario: DemoScenario | null) => {
+    setActiveScenario(scenario);
+    if (scenario) {
+      setCurrentTarget(scenario.asset.target);
+    } else {
+      setCurrentTarget('google.com');
+    }
+  };
 
   return (
     <div className="relative min-h-screen pb-16 overflow-hidden">
@@ -22,23 +118,40 @@ export default function Dashboard() {
 
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-7xl">
         {/* Main Hero Header */}
-        <div className="flex flex-col items-center text-center space-y-4 mb-10">
+        <div className="flex flex-col items-center text-center space-y-4 mb-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
             <Zap className="w-3.5 h-3.5 text-blue-400 fill-current" />
-            Network & Security Operations Suite
+            Network & Security Operations Suite Pro (EASM)
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white max-w-4xl leading-tight">
-            Diagnostica di Rete & <br className="hidden sm:inline" />
+            Attack Surface Monitoring & <br className="hidden sm:inline" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-red-400">
-              Vulnerability Assessment
+              Explainable Risk Scoring
             </span>
           </h1>
 
           <p className="text-zinc-400 max-w-2xl text-base sm:text-lg leading-relaxed">
-            Monitora latenza, DNS, posture crittografica e scansiona falle di sicurezza, file esposti (.env, .git) e misconfigurazioni CORS/Cookie.
+            Diagnostica profonda a 3 pilastri (Disponibilità, Configurazione, Sicurezza), protezione da SSRF, diffing temporale e assistenza AI alla remediation.
           </p>
         </div>
+
+        {/* 1-Click Interactive Demo Selector for Portfolio & Clients */}
+        <DemoScenarioSelector
+          activeScenarioId={activeScenario ? activeScenario.id : null}
+          onSelectScenario={handleSelectScenario}
+        />
+
+        {/* Explainable Risk Score Banner */}
+        <RiskScoreWidget
+          assessment={activeAssessment}
+          target={activeScenario ? activeScenario.asset.target : currentTarget}
+          asset={activeAsset}
+          onOpenAiRemediation={() => setAiDrawerOpen(true)}
+          onOpenDiffHistory={() => setDiffViewerOpen(true)}
+          onOpenAssetInventory={() => setAssetModalOpen(true)}
+          onOpenWebhookManager={() => setWebhookModalOpen(true)}
+        />
 
         {/* Interactive Tab Switcher Selector */}
         <div className="flex justify-center mb-8">
@@ -53,7 +166,7 @@ export default function Dashboard() {
               }`}
             >
               <Globe className="w-4 h-4" />
-              External Tests
+              External Diagnostics
             </button>
 
             <button 
@@ -156,14 +269,48 @@ export default function Dashboard() {
         {/* Footer */}
         <footer className="mt-20 pt-8 border-t border-zinc-800/60 flex flex-col sm:flex-row items-center justify-between text-zinc-500 text-xs gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-red-500" />
-            <span>Network Diagnostic & Vulnerability Operations Center</span>
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>NetworkDiagOps Pro &bull; Attack Surface & Risk Management</span>
           </div>
           <div>
             &copy; 2026 NetworkDiag Tool &bull; Powered by LibSQL & Edge Next.js
           </div>
         </footer>
       </div>
+
+      {/* AI Remediation Copilot Drawer */}
+      <AiRemediationDrawer
+        isOpen={aiDrawerOpen}
+        onClose={() => setAiDrawerOpen(false)}
+        target={activeScenario ? activeScenario.asset.target : currentTarget}
+        assessment={activeAssessment}
+      />
+
+      {/* Diff Viewer Modal */}
+      <ScanDiffViewer
+        isOpen={diffViewerOpen}
+        onClose={() => setDiffViewerOpen(false)}
+        diffResult={activeDiffResult}
+      />
+
+      {/* Asset Inventory Modal */}
+      <AssetInventoryModal
+        isOpen={assetModalOpen}
+        onClose={() => setAssetModalOpen(false)}
+        onSelectTarget={(t) => {
+          setActiveScenario(null);
+          setCurrentTarget(t);
+        }}
+      />
+
+      {/* Webhook Manager Modal */}
+      <WebhookManagerModal
+        isOpen={webhookModalOpen}
+        onClose={() => setWebhookModalOpen(false)}
+        target={activeScenario ? activeScenario.asset.target : currentTarget}
+      />
     </div>
   );
 }
+
+

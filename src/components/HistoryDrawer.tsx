@@ -9,10 +9,13 @@ import {
   Flame, 
   Globe, 
   Wifi,
-  RefreshCw
+  RefreshCw,
+  GitCompare
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ScanDiffViewer } from './dashboard/ScanDiffViewer';
+import { ScanDiffResult } from '@/types/findings';
 
 interface HistoryEntry {
   id: string;
@@ -26,7 +29,10 @@ export function HistoryDrawer() {
   const [isOpen, setIsOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [diffOpen, setDiffOpen] = useState(false);
+  const [diffResult, setDiffResult] = useState<ScanDiffResult | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -48,6 +54,42 @@ export function HistoryDrawer() {
       fetchHistory();
     }
   }, [isOpen]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      }
+      if (prev.length >= 2) {
+        return [prev[1], id];
+      }
+      return [...prev, id];
+    });
+  };
+
+  const handleCompare = async () => {
+    if (selectedIds.length !== 2) return;
+    setDiffLoading(true);
+    setDiffOpen(true);
+    try {
+      const res = await fetch('/api/history/diff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          previousId: selectedIds[1],
+          currentId: selectedIds[0],
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDiffResult(data);
+      }
+    } catch (err) {
+      console.error('Diff error:', err);
+    } finally {
+      setDiffLoading(false);
+    }
+  };
 
   const getTestIcon = (type: string) => {
     if (type.includes('vulnerabilit')) return Flame;
@@ -75,7 +117,7 @@ export function HistoryDrawer() {
             <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-blue-400" />
-                <h3 className="font-bold text-white text-base">Storico Test (Turso DB)</h3>
+                <h3 className="font-bold text-white text-base">Storico Test & Diffing</h3>
               </div>
               <button
                 onClick={() => setIsOpen(false)}
@@ -84,6 +126,24 @@ export function HistoryDrawer() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Compare Bar if items selected */}
+            {selectedIds.length > 0 && (
+              <div className="p-3 bg-blue-950/40 border-b border-blue-900/50 flex items-center justify-between text-xs">
+                <span className="text-blue-300 font-medium">
+                  {selectedIds.length}/2 scansioni selezionate per il diffing
+                </span>
+                <Button
+                  onClick={handleCompare}
+                  disabled={selectedIds.length !== 2}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-500 text-white h-7 text-xs gap-1.5 rounded-lg disabled:opacity-40"
+                >
+                  <GitCompare className="w-3.5 h-3.5" />
+                  Confronta (Diff)
+                </Button>
+              </div>
+            )}
 
             {/* Content List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -96,23 +156,30 @@ export function HistoryDrawer() {
                 <div className="text-center py-20 text-zinc-500 space-y-2">
                   <Calendar className="w-8 h-8 mx-auto opacity-40" />
                   <p className="text-sm font-medium">Nessun test salvato</p>
-                  <p className="text-xs text-zinc-600">I test eseguiti mentre sei autenticato compariranno qui.</p>
+                  <p className="text-xs text-zinc-600">I test eseguiti compariranno qui per il confronto temporale.</p>
                 </div>
               ) : (
                 history.map((item) => {
                   const Icon = getTestIcon(item.test_type);
+                  const isSelected = selectedIds.includes(item.id);
                   return (
                     <div
                       key={item.id}
-                      onClick={() => setSelectedEntry(item === selectedEntry ? null : item)}
+                      onClick={() => toggleSelect(item.id)}
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                        selectedEntry?.id === item.id 
-                          ? 'bg-blue-950/30 border-blue-500/50 shadow-md' 
+                        isSelected 
+                          ? 'bg-blue-950/40 border-blue-500 shadow-md ring-1 ring-blue-500/50' 
                           : 'bg-zinc-900/60 border-zinc-800/80 hover:border-zinc-700'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-0"
+                          />
                           <div className="p-1.5 rounded-lg bg-zinc-800 text-zinc-300">
                             <Icon className="w-3.5 h-3.5" />
                           </div>
@@ -125,22 +192,12 @@ export function HistoryDrawer() {
                         </Badge>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+                      <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pl-6">
                         <span className="text-blue-300 truncate max-w-[200px]">{item.target}</span>
                         <span className="text-[10px] text-zinc-600">
                           {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-
-                      {/* Expanded Details preview */}
-                      {selectedEntry?.id === item.id && (
-                        <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2 text-xs font-mono animate-in fade-in">
-                          <span className="text-[10px] text-zinc-500 uppercase block font-sans">Risultati Salvati:</span>
-                          <pre className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-900 text-[11px] text-zinc-300 overflow-x-auto max-h-40">
-                            {JSON.stringify(item.results, null, 2)}
-                          </pre>
-                        </div>
-                      )}
                     </div>
                   );
                 })
@@ -162,6 +219,15 @@ export function HistoryDrawer() {
           </div>
         </div>
       )}
+
+      {/* Diff Viewer Modal */}
+      <ScanDiffViewer
+        isOpen={diffOpen}
+        onClose={() => setDiffOpen(false)}
+        diffResult={diffResult}
+        loading={diffLoading}
+      />
     </>
   );
 }
+
