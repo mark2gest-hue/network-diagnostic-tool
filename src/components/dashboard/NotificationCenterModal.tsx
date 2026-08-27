@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Bell, ShieldAlert, AlertTriangle, CheckCircle2, Trash2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -78,8 +79,13 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   onClose,
 }) => {
   const [alerts, setAlerts] = useState<SecurityAlert[]>(DEFAULT_ALERTS);
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const markAllAsRead = () => {
     setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
@@ -108,8 +114,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
   const unreadCount = alerts.filter((a) => !a.read).length;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] overflow-hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl flex flex-col max-h-[85vh] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
@@ -239,4 +245,6 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
