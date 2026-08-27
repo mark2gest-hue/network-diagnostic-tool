@@ -1,12 +1,29 @@
 import { createClient } from '@libsql/client';
 
-const url = process.env.TURSO_DATABASE_URL || (process.env.NODE_ENV === 'production' ? 'file:/tmp/local.db' : 'file:local.db');
-const authToken = process.env.TURSO_AUTH_TOKEN;
+function getCleanDbConfig() {
+
+  let rawUrl = (process.env.TURSO_DATABASE_URL || '').trim().replace(/[\r\n]+/g, '').replace(/^['"]|['"]$/g, '');
+  let authToken = (process.env.TURSO_AUTH_TOKEN || '').trim().replace(/[\r\n]+/g, '').replace(/^['"]|['"]$/g, '');
+
+  // Se l'URL fornito non è valido o contiene ancora spazi, usa il fallback SQLite
+  if (!rawUrl || (!rawUrl.startsWith('libsql://') && !rawUrl.startsWith('https://') && !rawUrl.startsWith('http://') && !rawUrl.startsWith('file:'))) {
+    rawUrl = process.env.NODE_ENV === 'production' ? 'file:/tmp/local.db' : 'file:local.db';
+    authToken = '';
+  }
+
+  return {
+    url: rawUrl,
+    authToken: authToken || undefined,
+  };
+}
+
+const dbConfig = getCleanDbConfig();
 
 export const db = createClient({
-  url,
-  authToken,
+  url: dbConfig.url,
+  authToken: dbConfig.authToken,
 });
+
 
 let initPromise: Promise<void> | null = null;
 
