@@ -21,7 +21,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export function ManualSection() {
-  const [activeTab, setActiveTab] = useState<'external' | 'lan' | 'vulnerabilities' | 'vps'>('external');
+  const [activeTab, setActiveTab] = useState<'external' | 'lan' | 'vulnerabilities' | 'vps' | 'easm' | 'ai'>('external');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const copyCommand = (text: string, index: number) => {
@@ -41,12 +41,12 @@ export function ManualSection() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('MANUALE OPERATIVO & GUIDA TECNICA', 14, 20);
+    doc.text('MANUALE OPERATIVO & GUIDA TECNICA EASM', 14, 20);
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(148, 163, 184);
-    doc.text('Network Diagnostic & Vulnerability Operations Center | Versione Enterprise 2.0', 14, 28);
+    doc.text('Network Diagnostic, EASM & AI Remediation Copilot | Versione Enterprise 2.5', 14, 28);
     doc.text(`Documento generato il: ${new Date().toLocaleDateString()} alle ${new Date().toLocaleTimeString()}`, 14, 35);
 
     // Sezione 1: Diagnostica Esterna
@@ -123,24 +123,24 @@ export function ManualSection() {
     const finalY2 = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY || 130;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('4. Checklist Hardening Sistema Operativo VPS (Linux / Ubuntu)', 14, finalY2 + 12);
+    doc.text('4. Postura EASM, Time-Travel Diffing & AI Copilot', 14, finalY2 + 12);
 
     autoTable(doc, {
       startY: finalY2 + 17,
-      head: [['Comando / Azione', 'Configurazione Consigliata', 'Scopo']],
+      head: [['Capacita EASM', 'Funzione & Metrica', 'Best Practice Operativa']],
       body: [
-        ['Firewall UFW', 'sudo ufw default deny incoming\nsudo ufw allow 80,443,22/tcp\nsudo ufw enable', 'Blocca tutte le porte non esplicitamente autorizzate.'],
-        ['SSH Key-Only Auth', '/etc/ssh/sshd_config:\nPasswordAuthentication no\nPermitRootLogin no', 'Elimina il rischio di brute-force password su SSH.'],
-        ['Fail2ban', 'sudo apt install fail2ban -y', 'Banna automaticamente IP malevoli dopo tentativi falliti.'],
-        ['Patch Automatiche', 'sudo apt install unattended-upgrades', 'Installa patch di sicurezza del kernel in automatico.']
+        ['Explainable Risk Score (0-100)', '3 Pilastri: Disponibilita (30%), Configurazione (30%), Sicurezza (40%)', 'Mantenere score > 90 (Rating A/A+). Isolare immediatamente i finding critici.'],
+        ['Time-Travel Diffing (T0 vs T1)', 'Confronto temporale tra due scansioni per rilevare drift negativo', 'Eseguire dopo ogni deploy per verificare che porte o file non siano stati aperti.'],
+        ['AI Remediation Copilot', 'Generazione automatica di snippet Nginx/UFW e riassunto per CISO', 'Copiare i comandi suggeriti e applicarli sul firewall del server di produzione.'],
+        ['Gestione Falsi Positivi', 'Override per comportamenti intenzionali con ricalcolo live', 'Documentare i rischi accettati per audit di conformita (ISO 27001 / PCI-DSS).']
       ],
       theme: 'grid',
-      headStyles: { fillColor: [79, 70, 229] },
+      headStyles: { fillColor: [124, 58, 237] },
       styles: { fontSize: 8.5 }
     });
 
     // Salva il file PDF
-    doc.save(`Manuale_Operativo_NetworkDiag_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`Manuale_Operativo_EASM_NetworkDiag_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -153,11 +153,11 @@ export function ManualSection() {
               <BookOpen className="w-5 h-5" />
             </div>
             <h2 className="text-2xl font-black text-white tracking-tight">
-              Manuale Operativo & Documentazione Tecnica
+              Manuale Operativo & Documentazione Tecnica EASM
             </h2>
           </div>
           <p className="text-sm text-zinc-400 max-w-2xl">
-            Guida passo-passo per comprendere tutte le metriche diagnostiche, risolvere le vulnerabilità rilevate e applicare l&apos;hardening su server VPS.
+            Guida passo-passo per comprendere le metriche diagnostiche, risolvere le vulnerabilità, monitorare il drift post-deploy e sfruttare l&apos;AI Remediation Copilot.
           </p>
         </div>
 
@@ -170,8 +170,8 @@ export function ManualSection() {
         </Button>
       </div>
 
-      {/* 4 Topic Selector Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* 6 Topic Selector Chips */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <button
           onClick={() => setActiveTab('external')}
           className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
@@ -185,14 +185,14 @@ export function ManualSection() {
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
               activeTab === 'external' ? 'bg-blue-500/20 text-blue-300' : 'bg-zinc-800 text-zinc-500'
             }`}>
-              Capitolo 1
+              Cap. 1
             </span>
           </div>
           <div className="mt-3">
             <span className={`font-bold text-sm block ${activeTab === 'external' ? 'text-white' : 'text-zinc-300'}`}>
-              Diagnostica Esterna
+              Diagnostica
             </span>
-            <span className="text-[11px] text-zinc-400">DNS, TTFB, HTTP/3, SSL</span>
+            <span className="text-[11px] text-zinc-400">DNS, TTFB, HTTP/3</span>
           </div>
         </button>
 
@@ -209,14 +209,14 @@ export function ManualSection() {
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
               activeTab === 'lan' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500'
             }`}>
-              Capitolo 2
+              Cap. 2
             </span>
           </div>
           <div className="mt-3">
             <span className={`font-bold text-sm block ${activeTab === 'lan' ? 'text-white' : 'text-zinc-300'}`}>
-              Rete Locale (WiFi & Cavo)
+              Rete Locale
             </span>
-            <span className="text-[11px] text-zinc-400">Tabella ARP, Gateway, CSV</span>
+            <span className="text-[11px] text-zinc-400">ARP, Gateway, CSV</span>
           </div>
         </button>
 
@@ -233,14 +233,62 @@ export function ManualSection() {
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
               activeTab === 'vulnerabilities' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-800 text-zinc-500'
             }`}>
-              Capitolo 3
+              Cap. 3
             </span>
           </div>
           <div className="mt-3">
             <span className={`font-bold text-sm block ${activeTab === 'vulnerabilities' ? 'text-white' : 'text-zinc-300'}`}>
-              Vulnerability Scanner
+              Vulnerabilità
             </span>
-            <span className="text-[11px] text-zinc-400">.env, Cookie, CORS, CAA</span>
+            <span className="text-[11px] text-zinc-400">.env, Cookie, CORS</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('easm')}
+          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+            activeTab === 'easm'
+              ? 'bg-amber-950/40 border-amber-500/50 shadow-lg shadow-amber-600/15'
+              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <Zap className={`w-5 h-5 ${activeTab === 'easm' ? 'text-amber-400' : 'text-zinc-500'}`} />
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+              activeTab === 'easm' ? 'bg-amber-500/20 text-amber-300' : 'bg-zinc-800 text-zinc-500'
+            }`}>
+              Cap. 4
+            </span>
+          </div>
+          <div className="mt-3">
+            <span className={`font-bold text-sm block ${activeTab === 'easm' ? 'text-white' : 'text-zinc-300'}`}>
+              Risk & Diffing
+            </span>
+            <span className="text-[11px] text-zinc-400">3 Pilastri, T0 vs T1</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ai')}
+          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+            activeTab === 'ai'
+              ? 'bg-violet-950/40 border-violet-500/50 shadow-lg shadow-violet-600/15'
+              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <Server className={`w-5 h-5 ${activeTab === 'ai' ? 'text-violet-400' : 'text-zinc-500'}`} />
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+              activeTab === 'ai' ? 'bg-violet-500/20 text-violet-300' : 'bg-zinc-800 text-zinc-500'
+            }`}>
+              Cap. 5
+            </span>
+          </div>
+          <div className="mt-3">
+            <span className={`font-bold text-sm block ${activeTab === 'ai' ? 'text-white' : 'text-zinc-300'}`}>
+              AI Copilot
+            </span>
+            <span className="text-[11px] text-zinc-400">Remediation, Webhooks</span>
           </div>
         </button>
 
@@ -248,29 +296,30 @@ export function ManualSection() {
           onClick={() => setActiveTab('vps')}
           className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
             activeTab === 'vps'
-              ? 'bg-purple-950/40 border-purple-500/50 shadow-lg shadow-purple-600/15'
+              ? 'bg-indigo-950/40 border-indigo-500/50 shadow-lg shadow-indigo-600/15'
               : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
           }`}
         >
           <div className="flex items-center justify-between">
-            <Terminal className={`w-5 h-5 ${activeTab === 'vps' ? 'text-purple-400' : 'text-zinc-500'}`} />
+            <Terminal className={`w-5 h-5 ${activeTab === 'vps' ? 'text-indigo-400' : 'text-zinc-500'}`} />
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'vps' ? 'bg-purple-500/20 text-purple-300' : 'bg-zinc-800 text-zinc-500'
+              activeTab === 'vps' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-zinc-800 text-zinc-500'
             }`}>
-              Capitolo 4
+              Cap. 6
             </span>
           </div>
           <div className="mt-3">
             <span className={`font-bold text-sm block ${activeTab === 'vps' ? 'text-white' : 'text-zinc-300'}`}>
-              Hardening VPS Linux
+              Hardening VPS
             </span>
-            <span className="text-[11px] text-zinc-400">UFW, SSH Keys, Fail2ban</span>
+            <span className="text-[11px] text-zinc-400">UFW, SSH, Fail2ban</span>
           </div>
         </button>
       </div>
 
       {/* Chapter Content in 2-Column Cards */}
       <div className="space-y-4 pt-2">
+
         {activeTab === 'external' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
@@ -465,17 +514,137 @@ export function ManualSection() {
           </div>
         )}
 
+        {activeTab === 'easm' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Zap className="w-4 h-4" />
+                <h3>1. Calcolo del Rischio EASM (3 Pilastri Matematici)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Lo score (0-100) è calcolato in modo deterministico e trasparente: <strong>Disponibilità (30%)</strong>, <strong>Configurazione (30%)</strong>, <strong>Sicurezza (40%)</strong>.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-amber-300 block font-mono text-[11px]">RATING AUDIT:</strong>
+                <p className="text-zinc-400">Score 90-100: A+ (Ottimale) | 75-89: B (Accettabile) | &lt;50: F (Critico / Incident).</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                <Globe className="w-4 h-4" />
+                <h3>2. Time-Travel Diffing (Drift Detection T0 vs T1)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Confronta automaticamente due istantanee temporali per evidenziare porte aperte di recente, certificati modificati o header di sicurezza rimossi dopo un deploy.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-blue-300 block font-mono text-[11px]">REGOLA OPERATIVA:</strong>
+                <p className="text-zinc-400">Esegui una scansione prima e subito dopo ogni deploy in produzione per verificare che il Delta Score non sia negativo.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <Shield className="w-4 h-4" />
+                <h3>3. Gestione Falsi Positivi & Rischio Accettato</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Permette agli ingegneri di contrassegnare finding intenzionali (es. porta SSH o test in ambiente dev), azzerando la penalità e ricalcolando il punteggio in tempo reale.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-emerald-300 block font-mono text-[11px]">CONFORMITÀ:</strong>
+                <p className="text-zinc-400">Tutti i rischi accettati restano tracciati nel database per conformità a standard ISO 27001 e SOC2.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+                <Server className="w-4 h-4" />
+                <h3>4. Moltiplicatore di Criticità per Ambiente</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                La gravità delle detrazioni viene pesata sull&apos;ambiente dell&apos;asset: <strong>Production (1.5x)</strong>, <strong>Staging (1.0x)</strong>, <strong>Development (0.6x)</strong>.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-purple-300 block font-mono text-[11px]">BEST PRACTICE:</strong>
+                <p className="text-zinc-400">Classifica sempre i domini critici in Tier 1 per ricevere priorità negli alert.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'ai' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-violet-400 font-bold text-sm">
+                <Server className="w-4 h-4" />
+                <h3>1. AI Remediation Copilot (Zero Allucinazioni)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Il motore AI analizza il payload JSON tipizzato dei finding reali ed estrae una sintesi manageriale e le 3 azioni di bonifica prioritarie con comandi pronti da incollare.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-violet-300 block font-mono text-[11px]">OUTPUT FORNITO:</strong>
+                <p className="text-zinc-400">Executive Summary per CISO + Blocchi configurazione Nginx e regole Firewall UFW.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <Zap className="w-4 h-4" />
+                <h3>2. Webhook Alert Dispatcher (Slack & Discord)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Invia notifiche automatiche in tempo reale verso i canali operativi di SecOps e DevOps ogni volta che viene rilevata una nuova porta esposta o un calo di punteggio.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-emerald-300 block font-mono text-[11px]">CANALI SUPPORTATI:</strong>
+                <p className="text-zinc-400">Slack Incoming Webhooks, Discord Webhook, Microsoft Teams e webhook generici JSON.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                <Globe className="w-4 h-4" />
+                <h3>3. Asset Inventory & Catalogazione Perimetrale</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Gestisci tutti i domini, sottodomini e indirizzi IP dell&apos;infrastruttura con assegnazione dell&apos;owner, tag personalizzati e avvio rapido di audit.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-blue-300 block font-mono text-[11px]">VANTAGGIO AUDIT:</strong>
+                <p className="text-zinc-400">Mantiene una vista d&apos;insieme completa per prevenire Shadow IT e asset orfani.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Shield className="w-4 h-4" />
+                <h3>4. Modalità Demo Showcase per Portfolio</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Permette di mostrare la piattaforma a clienti e recruiter con 3 scenari realistici istantanei (Fintech A+, E-Commerce Incident F, Staging K8s C).
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-amber-300 block font-mono text-[11px]">ACCESSO RAPIDO:</strong>
+                <p className="text-zinc-400">Selettore presente in cima alla pagina principale per switch istantaneo a 1-click.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'vps' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
-              <div className="flex items-center justify-between text-purple-400 font-bold text-sm">
+              <div className="flex items-center justify-between text-indigo-400 font-bold text-sm">
                 <div className="flex items-center gap-2">
                   <Terminal className="w-4 h-4" />
                   <h3>1. Firewall UFW (Blocco Ingressi Non Autorizzati)</h3>
                 </div>
                 <button 
                   onClick={() => copyCommand('sudo ufw default deny incoming\nsudo ufw allow 80/tcp\nsudo ufw allow 443/tcp\nsudo ufw allow 22/tcp\nsudo ufw enable', 2)}
-                  className="text-xs text-purple-400 hover:text-white flex items-center gap-1 font-sans"
+                  className="text-xs text-indigo-400 hover:text-white flex items-center gap-1 font-sans"
                 >
                   {copiedIndex === 2 ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   {copiedIndex === 2 ? 'Copiato' : 'Copia'}
@@ -556,3 +725,4 @@ sudo dpkg-reconfigure --priority=low unattended-upgrades`}
     </div>
   );
 }
+
