@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Activity, LogOut, LogIn } from 'lucide-react';
+import { Activity, LogOut, LogIn, Bell } from 'lucide-react';
 import { User } from '@/types/tests';
 import { HistoryDrawer } from './HistoryDrawer';
+import { NotificationCenterModal } from './dashboard/NotificationCenterModal';
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -42,7 +44,19 @@ export default function Header() {
         </Link>
 
         {/* Live Status indicator & Navigation */}
-        <nav className="flex items-center gap-2.5 sm:gap-3">
+        <nav className="flex items-center gap-2 sm:gap-3">
+          {/* Notification Center Trigger */}
+          <button
+            onClick={() => setNotificationsOpen(true)}
+            className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white transition-all"
+            title="Centro Notifiche & Alert di Sicurezza"
+          >
+            <Bell className="w-4 h-4 text-violet-400" />
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white shadow-md">
+              3
+            </span>
+          </button>
+
           <HistoryDrawer />
 
           <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400">
@@ -82,6 +96,13 @@ export default function Header() {
           )}
         </nav>
       </div>
+
+      {/* Notification Center Modal */}
+      <NotificationCenterModal
+        isOpen={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+      />
     </header>
   );
 }
+

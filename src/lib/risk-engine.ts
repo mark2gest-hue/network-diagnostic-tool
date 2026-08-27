@@ -2,10 +2,9 @@ import { Finding, FindingCategory, RiskAssessment, SecurityGrade } from '@/types
 
 /**
  * Calcola il punteggio di rischio (0-100) e il grading (A+ -> F)
- * in modo completamente deterministico, trasparente e spiegabile.
+ * scomposto in modo trasparente in Exposure (50%), Posture (30%) e Operational (20%).
  */
 export function calculateRiskAssessment(findings: Finding[]): RiskAssessment {
-  let score = 100;
   const deductions: RiskAssessment['deductions'] = [];
 
   const pillars = {
@@ -15,6 +14,11 @@ export function calculateRiskAssessment(findings: Finding[]): RiskAssessment {
   };
 
   for (const finding of findings) {
+    // Se il finding è stato marcato come Falso Positivo o Rischio Accettato, non detrarre punti
+    if (finding.status === 'false_positive' || finding.status === 'risk_accepted') {
+      continue;
+    }
+
     const pillar = pillars[finding.category];
     if (!pillar) continue;
 
@@ -24,19 +28,19 @@ export function calculateRiskAssessment(findings: Finding[]): RiskAssessment {
     switch (finding.severity) {
       case 'critical':
         pillar.criticalCount++;
-        deductionPoints = Math.round(25 * confidence);
+        deductionPoints = Math.round(35 * confidence);
         break;
       case 'high':
         pillar.highCount++;
-        deductionPoints = Math.round(15 * confidence);
+        deductionPoints = Math.round(20 * confidence);
         break;
       case 'medium':
         pillar.mediumCount++;
-        deductionPoints = Math.round(7 * confidence);
+        deductionPoints = Math.round(10 * confidence);
         break;
       case 'low':
         pillar.lowCount++;
-        deductionPoints = Math.round(2 * confidence);
+        deductionPoints = Math.round(4 * confidence);
         break;
       case 'info':
         pillar.infoCount++;
@@ -45,9 +49,9 @@ export function calculateRiskAssessment(findings: Finding[]): RiskAssessment {
     }
 
     if (deductionPoints > 0) {
-      score -= deductionPoints;
       pillar.score = Math.max(0, pillar.score - deductionPoints);
       deductions.push({
+        findingId: finding.id,
         rule: finding.title,
         points: deductionPoints,
         reason: finding.description,
@@ -56,23 +60,32 @@ export function calculateRiskAssessment(findings: Finding[]): RiskAssessment {
     }
   }
 
-  score = Math.max(0, Math.min(100, score));
+  // Scomposizione nei 3 punteggi specifici
+  const exposureScore = Math.max(0, Math.min(100, pillars.security.score));      // 50% peso
+  const postureScore = Math.max(0, Math.min(100, pillars.configuration.score)); // 30% peso
+  const operationalScore = Math.max(0, Math.min(100, pillars.availability.score)); // 20% peso
+
+  // Calcolo ponderato trasparente
+  let overallScore = Math.round((exposureScore * 0.5) + (postureScore * 0.3) + (operationalScore * 0.2));
+  overallScore = Math.max(0, Math.min(100, overallScore));
 
   // Assegnazione del grado
   let grade: SecurityGrade = 'F';
-  if (score >= 95) grade = 'A+';
-  else if (score >= 85) grade = 'A';
-  else if (score >= 70) grade = 'B';
-  else if (score >= 50) grade = 'C';
-  else if (score >= 35) grade = 'D';
+  if (overallScore >= 95) grade = 'A+';
+  else if (overallScore >= 85) grade = 'A';
+  else if (overallScore >= 70) grade = 'B';
+  else if (overallScore >= 50) grade = 'C';
+  else if (overallScore >= 35) grade = 'D';
   else grade = 'F';
 
-  // Se ci sono vulnerabilità critiche aperte, il voto massimo è 'C'
+  // Penalità: se ci sono vulnerabilità critiche aperte nella sicurezza, il grado massimo consentito è 'C'
   if (pillars.security.criticalCount > 0 && (grade === 'A+' || grade === 'A' || grade === 'B')) {
     grade = 'C';
   }
 
-  let summary = `Postura generale valutata con punteggio ${score}/100 (Grado ${grade}).`;
+  const formulaExplanation = `Punteggio Finale (${overallScore}) = Exposure [${exposureScore}] × 50% + Posture [${postureScore}] × 30% + Operational [${operationalScore}] × 20%`;
+
+  let summary = `Postura generale valutata con punteggio ${overallScore}/100 (Grado ${grade}).`;
   if (pillars.security.criticalCount > 0) {
     summary += ` Rilevate ${pillars.security.criticalCount} vulnerabilità critiche che richiedono intervento immediato.`;
   } else if (pillars.configuration.highCount > 0) {
@@ -82,14 +95,21 @@ export function calculateRiskAssessment(findings: Finding[]): RiskAssessment {
   }
 
   return {
-    overallScore: score,
+    overallScore,
     grade,
     summary,
+    breakdown: {
+      exposureScore,
+      postureScore,
+      operationalScore,
+      formulaExplanation,
+    },
     pillars,
     findings,
     deductions,
   };
 }
+
 
 /**
  * Converte e normalizza i dati grezzi provenienti da tutti i moduli di scansione

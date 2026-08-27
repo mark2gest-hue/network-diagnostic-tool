@@ -15,6 +15,41 @@ export const DemoScenarioSelector: React.FC<DemoScenarioSelectorProps> = ({
 }) => {
   return (
     <div className="w-full bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-xl mb-6">
+      {/* Visual Status Indicator Banner */}
+      <div className="mb-3.5 pb-3 border-b border-indigo-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+        {activeScenarioId ? (
+          <div className="flex items-center gap-2">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <span className="text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              ⚠️ SIMULAZIONE DEMO (DATI DI ESEMPIO PER PORTFOLIO / AUDIT)
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              🟢 SCANSIONE LIVE REALE (PRODUZIONE REALE)
+            </span>
+          </div>
+        )}
+
+        {activeScenarioId && (
+          <button
+            onClick={() => onSelectScenario(null)}
+            className="text-xs text-indigo-300 hover:text-white underline font-mono flex items-center gap-1.5 bg-indigo-950/60 px-3 py-1 rounded-lg border border-indigo-500/30 transition-all hover:bg-indigo-900"
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+            Passa a Scansione Reale Live
+          </button>
+        )}
+      </div>
+
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
@@ -23,26 +58,17 @@ export const DemoScenarioSelector: React.FC<DemoScenarioSelectorProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               Portfolio Interactive Demo & EASM Simulator
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 1-Click Showcase
               </span>
             </h3>
             <p className="text-xs text-slate-400">
-              Mostra istantaneamente a clienti e recruiter il calcolo del rischio, il drift temporale e la remediation AI senza attese.
+              Seleziona uno scenario per dimostrare istantaneamente a clienti e recruiter il calcolo del rischio, l’evidenza tecnica e il diffing.
             </p>
           </div>
         </div>
-
-        {activeScenarioId && (
-          <button
-            onClick={() => onSelectScenario(null)}
-            className="text-xs text-indigo-300 hover:text-white underline font-mono flex items-center gap-1 self-end md:self-auto"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            Torna a Scansione Live Utente
-          </button>
-        )}
       </div>
+
 
       {/* Scenario Buttons Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { RiskAssessment } from '@/types/findings';
-import { X, Bot, ShieldAlert, Check, Copy, Terminal, ExternalLink, RefreshCw, AlertCircle, FileText } from 'lucide-react';
+import { X, Bot, ShieldAlert, Check, Copy, Terminal, RefreshCw, AlertCircle, FileText } from 'lucide-react';
 
 interface AiRemediationDrawerProps {
   isOpen: boolean;
@@ -79,6 +79,40 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
   }, [isOpen, target, assessment, fetchAnalysis]);
 
 
+  const [copiedChecklist, setCopiedChecklist] = useState(false);
+
+  const copyFullChecklistMarkdown = () => {
+    if (!report) return;
+
+    let md = `# 🛡️ Piano di Remediation EASM - ${report.target}\n`;
+    md += `**Data**: ${new Date(report.timestamp).toLocaleString()} | **Score Iniziale**: ${report.score}/100 (${report.grade})\n\n`;
+    md += `## 📋 Executive Summary\n${report.executiveSummary}\n\n`;
+    md += `## 🎯 Azioni di Bonifica Prioritarie\n\n`;
+
+    report.topPriorities.forEach((item, idx) => {
+      md += `### ${idx + 1}. [${item.severity.toUpperCase()}] ${item.title}\n`;
+      md += `- **Evidenza**: ${item.evidence}\n`;
+      md += `- **Azione di Remediation**: ${item.action}\n`;
+      if (item.snippet) {
+        md += `\`\`\`bash\n${item.snippet}\n\`\`\`\n`;
+      }
+      md += `- **Verifica**: Ripetere la scansione diagnostica dopo l'applicazione delle modifiche.\n`;
+      md += `- **Riferimento**: ${item.reference}\n\n`;
+    });
+
+    if (report.falsePositivesAnalysis && report.falsePositivesAnalysis.length > 0) {
+      md += `## 💡 Note sui Falsi Positivi\n`;
+      report.falsePositivesAnalysis.forEach((fp) => {
+        md += `- **${fp.topic}**: ${fp.note}\n`;
+      });
+      md += `\n`;
+    }
+
+    navigator.clipboard.writeText(md);
+    setCopiedChecklist(true);
+    setTimeout(() => setCopiedChecklist(false), 3000);
+  };
+
   const copySnippet = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(idx);
@@ -107,6 +141,16 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {report && (
+              <button
+                onClick={copyFullChecklistMarkdown}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                title="Copia l'intero piano di remediation in formato Markdown"
+              >
+                {copiedChecklist ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedChecklist ? 'Checklist Copiata!' : 'Copia Checklist'}
+              </button>
+            )}
             <button
               onClick={fetchAnalysis}
               disabled={loading}
@@ -145,14 +189,14 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{report.executiveSummary}</p>
               </div>
 
-              {/* Top 3 Priorità di Remediation */}
+              {/* Top 3 Priorità di Remediation con formato strutturato */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-rose-400" />
                     Top Priorità di Remediation ({report.topPriorities.length})
                   </h3>
-                  <span className="text-xs text-slate-500">Ordinato per impatto sul rischio</span>
+                  <span className="text-xs text-slate-500">Ordinato per gravità</span>
                 </div>
 
                 {report.topPriorities.length === 0 ? (
@@ -163,20 +207,21 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
                   report.topPriorities.map((item, idx) => (
                     <div
                       key={idx}
-                      className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition-all space-y-3"
+                      className="p-5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition-all space-y-3.5"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      {/* Titolo e Severità */}
+                      <div className="flex items-start justify-between gap-3 border-b border-slate-800/60 pb-3">
                         <div className="flex items-start gap-2.5">
-                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 font-mono text-xs flex items-center justify-center font-bold">
-                            {item.rank}
+                          <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 font-mono text-xs flex items-center justify-center font-bold shrink-0">
+                            #{item.rank}
                           </span>
                           <div>
-                            <h4 className="text-sm font-semibold text-slate-100">{item.title}</h4>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">Evidenza: {item.evidence}</p>
+                            <h4 className="text-sm font-bold text-slate-100">{item.title}</h4>
+                            <p className="text-[11px] text-slate-400 font-mono mt-0.5">Evidenza: {item.evidence}</p>
                           </div>
                         </div>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded border uppercase font-mono font-bold ${
+                          className={`text-xs px-2 py-0.5 rounded border uppercase font-mono font-bold shrink-0 ${
                             item.severity === 'critical'
                               ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
                               : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
@@ -186,16 +231,26 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
                         </span>
                       </div>
 
-                      <div className="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800/60">
-                        <span className="font-semibold text-indigo-300 block mb-1">Azione Consigliata:</span>
-                        {item.action}
+                      {/* Blocco 1: Problema & Rischio */}
+                      <div className="space-y-1.5 text-xs text-slate-300">
+                        <span className="font-semibold text-rose-300 block">Rischio & Impatto:</span>
+                        <p className="text-slate-400 leading-relaxed">
+                          Possibile esposizione non autorizzata di dati o compromissione dell&apos;integrità del perimetro applicativo.
+                        </p>
                       </div>
 
+                      {/* Blocco 2: Azione Consigliata */}
+                      <div className="text-xs text-slate-300 bg-slate-900/90 p-3.5 rounded-lg border border-slate-800/60 space-y-1.5">
+                        <span className="font-bold text-indigo-300 block">Azioni Immediate di Bonifica:</span>
+                        <p className="text-slate-200">{item.action}</p>
+                      </div>
+
+                      {/* Blocco 3: Snippet Configurazione */}
                       {item.snippet && (
                         <div className="relative group">
                           <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 rounded-t-lg border-t border-x border-slate-800 text-[11px] text-slate-400">
-                            <span className="flex items-center gap-1.5 font-mono">
-                              <Terminal className="w-3 h-3 text-slate-500" /> Config / Snippet
+                            <span className="flex items-center gap-1.5 font-mono text-slate-300">
+                              <Terminal className="w-3.5 h-3.5 text-indigo-400" /> Comando / Configurazione Suggerita
                             </span>
                             <button
                               onClick={() => copySnippet(item.snippet!, idx)}
@@ -209,7 +264,7 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
                               ) : (
                                 <>
                                   <Copy className="w-3 h-3" />
-                                  <span>Copia</span>
+                                  <span>Copia Codice</span>
                                 </>
                               )}
                             </button>
@@ -220,13 +275,20 @@ export const AiRemediationDrawer: React.FC<AiRemediationDrawerProps> = ({
                         </div>
                       )}
 
-                      <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                        <ExternalLink className="w-3 h-3" /> Riferimento Tecnico: {item.reference}
+                      {/* Blocco 4: Verifica Post-Modifica */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/60 text-[11px] text-slate-400">
+                        <span>
+                          <strong>Verifica successiva:</strong> Rieseguire la scansione dopo aver applicato la modifica.
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-500">
+                          Ref: {item.reference}
+                        </span>
                       </div>
                     </div>
                   ))
                 )}
               </div>
+
 
               {/* Analisi dei Falsi Positivi */}
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">

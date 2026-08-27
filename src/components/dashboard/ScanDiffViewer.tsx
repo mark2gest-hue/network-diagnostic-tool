@@ -169,45 +169,110 @@ export const ScanDiffViewer: React.FC<ScanDiffViewerProps> = ({
                 </div>
               </div>
 
-              {/* Detailed Changes List */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-slate-200">Dettaglio Anomalie e Variazioni Riscontrate</h3>
-                {diffResult.changes.length === 0 ? (
-                  <div className="p-6 text-center rounded-xl bg-slate-950/40 border border-slate-800 text-xs text-slate-400">
-                    ✓ Nessuna differenza riscontrata tra le due scansioni. La postura e la configurazione sono identiche.
+              {/* View Switcher: Diff Dettagliato vs Timeline */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <span>Cronologia Modifiche & Timeline Eventi</span>
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {diffResult.timeline?.length || diffResult.changes.length} eventi
+                  </span>
+                </div>
+
+                {/* Timeline Events Rendering */}
+                {diffResult.timeline && diffResult.timeline.length > 0 && (
+                  <div className="space-y-3 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-800 my-4 pl-8">
+                    {diffResult.timeline.map((evt) => {
+                      const getTimelineClassBadge = (c: string) => {
+                        switch (c) {
+                          case 'new':
+                            return 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+                          case 'resolved':
+                            return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+                          case 'modified':
+                            return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+                          case 'recurring':
+                            return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+                          default:
+                            return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
+                        }
+                      };
+
+                      return (
+                        <div key={evt.id} className="relative group">
+                          {/* Timeline dot */}
+                          <div className={`absolute -left-8 top-1.5 w-3 h-3 rounded-full border-2 border-slate-900 ${
+                            evt.severity === 'critical' ? 'bg-rose-500' : evt.severity === 'high' ? 'bg-orange-500' : 'bg-blue-500'
+                          }`} />
+
+                          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition-all space-y-1.5 text-xs">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                              <span className="font-bold text-slate-100 text-sm flex items-center gap-2">
+                                {evt.title}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] px-2 py-0.2 rounded border font-mono font-bold uppercase ${getTimelineClassBadge(evt.classification)}`}>
+                                  {evt.classification === 'new' ? 'Nuovo' : evt.classification === 'resolved' ? 'Risolto' : evt.classification === 'modified' ? 'Modificato' : evt.classification}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono">{evt.date}</span>
+                              </div>
+                            </div>
+                            <p className="text-slate-400 leading-relaxed">{evt.description}</p>
+                            {evt.evidence && (
+                              <div className="p-2 rounded bg-slate-900 border border-slate-800 font-mono text-[11px] text-slate-300">
+                                Evidenza: {evt.evidence}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : (
-                  diffResult.changes.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2 text-xs"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded border uppercase font-mono font-bold text-[10px] ${getChangeBadge(item.changeType)}`}>
-                            {getChangeLabel(item.changeType)}
-                          </span>
-                          <span className="font-semibold text-slate-100 text-sm">{item.title}</span>
-                        </div>
-                      </div>
-                      <p className="text-slate-400">{item.description}</p>
-                      {(item.previousEvidence || item.currentEvidence) && (
-                        <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 font-mono text-[11px] space-y-1">
-                          {item.previousEvidence && (
-                            <div className="text-rose-400/90 flex items-center gap-1.5">
-                              <span className="text-slate-500 font-sans">Prima:</span> {item.previousEvidence}
-                            </div>
-                          )}
-                          {item.currentEvidence && (
-                            <div className="text-emerald-400 flex items-center gap-1.5">
-                              <span className="text-slate-500 font-sans">Ora:</span> {item.currentEvidence}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))
                 )}
+
+                {/* Detailed Changes List */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Dettaglio Tecnico delle Variazioni ({diffResult.changes.length})
+                  </h4>
+                  {diffResult.changes.length === 0 ? (
+                    <div className="p-6 text-center rounded-xl bg-slate-950/40 border border-slate-800 text-xs text-slate-400">
+                      ✓ Nessuna differenza riscontrata tra le due scansioni. La postura e la configurazione sono identiche.
+                    </div>
+                  ) : (
+                    diffResult.changes.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded border uppercase font-mono font-bold text-[10px] ${getChangeBadge(item.changeType)}`}>
+                              {getChangeLabel(item.changeType)}
+                            </span>
+                            <span className="font-semibold text-slate-100 text-sm">{item.title}</span>
+                          </div>
+                        </div>
+                        <p className="text-slate-400">{item.description}</p>
+                        {(item.previousEvidence || item.currentEvidence) && (
+                          <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 font-mono text-[11px] space-y-1">
+                            {item.previousEvidence && (
+                              <div className="text-rose-400/90 flex items-center gap-1.5">
+                                <span className="text-slate-500 font-sans">Prima:</span> {item.previousEvidence}
+                              </div>
+                            )}
+                            {item.currentEvidence && (
+                              <div className="text-emerald-400 flex items-center gap-1.5">
+                                <span className="text-slate-500 font-sans">Ora:</span> {item.currentEvidence}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </>
           ) : (
@@ -218,3 +283,4 @@ export const ScanDiffViewer: React.FC<ScanDiffViewerProps> = ({
     </div>
   );
 };
+
