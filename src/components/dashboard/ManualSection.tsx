@@ -21,7 +21,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export function ManualSection() {
-  const [activeTab, setActiveTab] = useState<'external' | 'lan' | 'vulnerabilities' | 'vps' | 'easm' | 'ai'>('external');
+  const [activeTab, setActiveTab] = useState<'external' | 'lan' | 'vulnerabilities' | 'vps' | 'easm' | 'ai' | 'playbook'>('external');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const copyCommand = (text: string, index: number) => {
@@ -46,7 +46,7 @@ export function ManualSection() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(148, 163, 184);
-    doc.text('Network Diagnostic, EASM & AI Remediation Copilot | Versione Enterprise 2.5', 14, 28);
+    doc.text('Network Diagnostic, EASM, Playbook Clienti & AI Remediation | Versione Enterprise 2.5', 14, 28);
     doc.text(`Documento generato il: ${new Date().toLocaleDateString()} alle ${new Date().toLocaleTimeString()}`, 14, 35);
 
     // Sezione 1: Diagnostica Esterna
@@ -98,7 +98,7 @@ export function ManualSection() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text('3. Vulnerability Assessment & Hardening Server VPS', 14, 16);
+    doc.text('3. Vulnerability Assessment & Postura EASM', 14, 16);
 
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(12);
@@ -123,16 +123,18 @@ export function ManualSection() {
     const finalY2 = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY || 130;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('4. Postura EASM, Time-Travel Diffing & AI Copilot', 14, finalY2 + 12);
+    doc.text('4. Playbook Operativo per Assessment Live su Clienti', 14, finalY2 + 12);
 
     autoTable(doc, {
       startY: finalY2 + 17,
-      head: [['Capacita EASM', 'Funzione & Metrica', 'Best Practice Operativa']],
+      head: [['Fase di Assessment', 'Azioni da Eseguire dal Vivo', 'Output & Valore Consegnato']],
       body: [
-        ['Explainable Risk Score (0-100)', '3 Pilastri: Disponibilita (30%), Configurazione (30%), Sicurezza (40%)', 'Mantenere score > 90 (Rating A/A+). Isolare immediatamente i finding critici.'],
-        ['Time-Travel Diffing (T0 vs T1)', 'Confronto temporale tra due scansioni per rilevare drift negativo', 'Eseguire dopo ogni deploy per verificare che porte o file non siano stati aperti.'],
-        ['AI Remediation Copilot', 'Generazione automatica di snippet Nginx/UFW e riassunto per CISO', 'Copiare i comandi suggeriti e applicarli sul firewall del server di produzione.'],
-        ['Gestione Falsi Positivi', 'Override per comportamenti intenzionali con ricalcolo live', 'Documentare i rischi accettati per audit di conformita (ISO 27001 / PCI-DSS).']
+        ['Fase 1: Setup Target & Asset', 'Disattivare la demo e aggiungere il dominio del cliente in Asset Inventory.', 'Tracciamento perimetro aziendale e ambiente (Prod/Stage).'],
+        ['Fase 2: Diagnostica & TTFB', 'Eseguire test DNS globale, latenza TTFB e ispezione certificato SSL.', 'Evidenza di colli di bottiglia o scadenze certificati imminenti.'],
+        ['Fase 3: Audit Porte & Email', 'Scansione porte esposte (22, 3306, 6379) e verifica SPF/DKIM/DMARC.', 'Prevenzione attacchi brute-force e rischio spoofing/phishing.'],
+        ['Fase 4: Vulnerability Scanner', 'Test file .env/.git esposti, cookie flags (Secure/HttpOnly) e CORS.', 'Rilevamento immediato di fughe di credenziali e token.'],
+        ['Fase 5: Formula Trasparente', 'Mostrare il calcolo del rischio (Exposure 50%, Posture 30%, Operational 20%).', 'Punteggio spiegabile senza formule oscure o allucinazioni.'],
+        ['Fase 6: AI Remediation & PDF', 'Generare piano di bonifica, copiare la checklist e scaricare il PDF.', 'Piano d\'azione numerato pronto per il team IT / Jira.']
       ],
       theme: 'grid',
       headStyles: { fillColor: [124, 58, 237] },
@@ -170,8 +172,8 @@ export function ManualSection() {
         </Button>
       </div>
 
-      {/* 6 Topic Selector Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* 7 Topic Selector Chips */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <button
           onClick={() => setActiveTab('external')}
           className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
@@ -192,7 +194,7 @@ export function ManualSection() {
             <span className={`font-bold text-sm block ${activeTab === 'external' ? 'text-white' : 'text-zinc-300'}`}>
               Diagnostica
             </span>
-            <span className="text-[11px] text-zinc-400">DNS, TTFB, HTTP/3</span>
+            <span className="text-[11px] text-zinc-400">DNS, TTFB</span>
           </div>
         </button>
 
@@ -216,7 +218,7 @@ export function ManualSection() {
             <span className={`font-bold text-sm block ${activeTab === 'lan' ? 'text-white' : 'text-zinc-300'}`}>
               Rete Locale
             </span>
-            <span className="text-[11px] text-zinc-400">ARP, Gateway, CSV</span>
+            <span className="text-[11px] text-zinc-400">ARP, Gateway</span>
           </div>
         </button>
 
@@ -240,7 +242,7 @@ export function ManualSection() {
             <span className={`font-bold text-sm block ${activeTab === 'vulnerabilities' ? 'text-white' : 'text-zinc-300'}`}>
               Vulnerabilità
             </span>
-            <span className="text-[11px] text-zinc-400">.env, Cookie, CORS</span>
+            <span className="text-[11px] text-zinc-400">.env, Cookie</span>
           </div>
         </button>
 
@@ -262,9 +264,9 @@ export function ManualSection() {
           </div>
           <div className="mt-3">
             <span className={`font-bold text-sm block ${activeTab === 'easm' ? 'text-white' : 'text-zinc-300'}`}>
-              Risk & Diffing
+              Postura EASM
             </span>
-            <span className="text-[11px] text-zinc-400">3 Pilastri, T0 vs T1</span>
+            <span className="text-[11px] text-zinc-400">Diffing & Score</span>
           </div>
         </button>
 
@@ -277,7 +279,7 @@ export function ManualSection() {
           }`}
         >
           <div className="flex items-center justify-between">
-            <Server className={`w-5 h-5 ${activeTab === 'ai' ? 'text-violet-400' : 'text-zinc-500'}`} />
+            <FileCode className={`w-5 h-5 ${activeTab === 'ai' ? 'text-violet-400' : 'text-zinc-500'}`} />
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
               activeTab === 'ai' ? 'bg-violet-500/20 text-violet-300' : 'bg-zinc-800 text-zinc-500'
             }`}>
@@ -288,7 +290,7 @@ export function ManualSection() {
             <span className={`font-bold text-sm block ${activeTab === 'ai' ? 'text-white' : 'text-zinc-300'}`}>
               AI Copilot
             </span>
-            <span className="text-[11px] text-zinc-400">Remediation, Webhooks</span>
+            <span className="text-[11px] text-zinc-400">Remediation</span>
           </div>
         </button>
 
@@ -312,7 +314,31 @@ export function ManualSection() {
             <span className={`font-bold text-sm block ${activeTab === 'vps' ? 'text-white' : 'text-zinc-300'}`}>
               Hardening VPS
             </span>
-            <span className="text-[11px] text-zinc-400">UFW, SSH, Fail2ban</span>
+            <span className="text-[11px] text-zinc-400">UFW, SSH</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('playbook')}
+          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+            activeTab === 'playbook'
+              ? 'bg-emerald-950/40 border-emerald-500/50 shadow-lg shadow-emerald-600/15'
+              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <AlertOctagon className={`w-5 h-5 ${activeTab === 'playbook' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+              activeTab === 'playbook' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500'
+            }`}>
+              Cap. 7
+            </span>
+          </div>
+          <div className="mt-3">
+            <span className={`font-bold text-sm block ${activeTab === 'playbook' ? 'text-white' : 'text-zinc-300'}`}>
+              Playbook Clienti
+            </span>
+            <span className="text-[11px] text-emerald-400">Audit Live</span>
           </div>
         </button>
       </div>
@@ -718,6 +744,95 @@ sudo systemctl enable --now fail2ban`}
 {`sudo apt install unattended-upgrades -y
 sudo dpkg-reconfigure --priority=low unattended-upgrades`}
               </pre>
+            </div>
+          </div>
+        )}
+
+        {/* Capitolo 7: Playbook Operativo per Audit Clienti */}
+        {activeTab === 'playbook' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <Globe className="w-4 h-4" />
+                <h3>Fase 1: Setup Target & Asset Inventory</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                In alto clicca su <strong>&ldquo;Passa a Scansione Reale Live&rdquo;</strong>. Apri poi <strong>&ldquo;Asset Inventory&rdquo;</strong> e registra il dominio del cliente specificando ambiente (Produzione/Staging) e livello di criticità.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-emerald-300 block font-mono text-[11px]">OBIETTIVO:</strong>
+                <p className="text-zinc-400">Formalizzare il perimetro di audit e censire i target per monitoraggio continuo e conformità.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                <Zap className="w-4 h-4" />
+                <h3>Fase 2: Diagnostica Esterna & Performance (Tab 1)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Esegui la scansione su <strong>External Diagnostics</strong> per valutare la risoluzione DNS globale (6 resolver), la latenza al primo byte (TTFB) e lo stato del certificato crittografico SSL/TLS.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-blue-300 block font-mono text-[11px]">SEGNALI D&apos;ALLARME:</strong>
+                <p className="text-zinc-400">TTFB &gt; 500ms (collo di bottiglia backend), certificato in scadenza &lt; 15 giorni o mancato supporto HTTP/2 / HTTP/3.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+                <Shield className="w-4 h-4" />
+                <h3>Fase 3: Security Audit & Email Deliverability (Tab 3)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Scansiona le porte aperte su IP pubblico e analizza i record email SPF, DKIM e la policy DMARC.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-purple-300 block font-mono text-[11px]">COSA DIMOSTRARE AL CLIENTE:</strong>
+                <p className="text-zinc-400">Porte DB esposte (3306, 5432, 6379) o DMARC debole (p=none) che consente spoofing e phishing verso i propri clienti.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-red-400 font-bold text-sm">
+                <AlertOctagon className="w-4 h-4" />
+                <h3>Fase 4: Vulnerability Scanner & Leak File (Tab 4)</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Avvia il modulo Vulnerability Scanner per verificare se file come <code className="text-rose-400">/.env</code>, <code className="text-rose-400">/.git/config</code> o <code className="text-rose-400">/backup.sql</code> sono pubblicamente scaricabili e controlla i flag dei cookie (Secure, HttpOnly).
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-red-300 block font-mono text-[11px]">MASSIMO IMPATTO:</strong>
+                <p className="text-zinc-400">Se viene trovato un file .env esposto, mostrare come le chiavi DB/Stripe siano accessibili su internet senza autenticazione.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Zap className="w-4 h-4" />
+                <h3>Fase 5: Spiegazione Score con Formula Trasparente</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Mostra al cliente la composizione scientifica del punteggio: <strong>Exposure Score (50%)</strong> + <strong>Posture Score (30%)</strong> + <strong>Operational Score (20%)</strong>.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-amber-300 block font-mono text-[11px]">EVIDENZE TECNICHE RAW:</strong>
+                <p className="text-zinc-400">Espandi <em>&ldquo;Mostra Evidenza&rdquo;</em> su ogni finding per dimostrare l&apos;esatta risposta raw del loro server.</p>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
+              <div className="flex items-center gap-2 text-teal-400 font-bold text-sm">
+                <FileCode className="w-4 h-4" />
+                <h3>Fase 6: AI Remediation & Consegna Report</h3>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Apri l&apos;<strong>AI Remediation Copilot</strong> e clicca su <strong>&ldquo;📋 Copia Checklist&rdquo;</strong> per consegnare al cliente il piano di bonifica in formato Markdown, pronto per i ticket del loro team di sviluppo.
+              </p>
+              <div className="bg-zinc-950/80 p-3 rounded-xl border border-zinc-800 text-xs space-y-1">
+                <strong className="text-teal-300 block font-mono text-[11px]">DELIVERABLE IMMEDIATO:</strong>
+                <p className="text-zinc-400">Clicca su <em>&ldquo;Scarica Manuale Completo in PDF&rdquo;</em> per rilasciare il documento tecnico ufficiale di posture security.</p>
+              </div>
             </div>
           </div>
         )}
