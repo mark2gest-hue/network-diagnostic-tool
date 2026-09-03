@@ -74,13 +74,12 @@ export function SpeedtestWidget() {
             }
           }
         } catch {
-          // Fallback chunk
-          totalBytes += 4000000;
+          // Errore stream download: non sommare byte simulati
         }
       }
 
-      const dlElapsed = (performance.now() - dlStart) / 1000;
-      const finalDlMbps = Math.max(1, Math.round(((totalBytes * 8) / (dlElapsed * 1000000)) * 10) / 10);
+      const dlElapsed = Math.max(0.1, (performance.now() - dlStart) / 1000);
+      const finalDlMbps = totalBytes > 0 ? Math.round(((totalBytes * 8) / (dlElapsed * 1000000)) * 10) / 10 : 0;
       setCurrentSpeed(finalDlMbps);
 
       // 3. Upload Test
@@ -104,12 +103,12 @@ export function SpeedtestWidget() {
             setCurrentSpeed(liveUlMbps);
           }
         } catch {
-          ulBytes += 1500000;
+          // Errore stream upload: non sommare byte fittizi
         }
       }
 
-      const ulElapsed = (performance.now() - ulStart) / 1000;
-      const finalUlMbps = Math.max(1, Math.round(((ulBytes * 8) / (ulElapsed * 1000000)) * 10) / 10);
+      const ulElapsed = Math.max(0.1, (performance.now() - ulStart) / 1000);
+      const finalUlMbps = ulBytes > 0 ? Math.round(((ulBytes * 8) / (ulElapsed * 1000000)) * 10) / 10 : 0;
 
       const finalResult: SpeedtestResult = {
         downloadMbps: finalDlMbps,

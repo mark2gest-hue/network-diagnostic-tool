@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isPrivateOrReservedIP, isInternalHostname } from './security-guard';
+import { isPrivateOrReservedIP, isInternalHostname, validateExternalTarget } from './security-guard';
 
 export const domainSchema = z.preprocess(
   (val) => val ?? '',
@@ -31,4 +31,20 @@ export const ipSchema = z.preprocess(
 );
 
 export const targetSchema = z.union([domainSchema, ipSchema]);
+
+export async function validateSafeTarget(rawTarget: unknown): Promise<
+  | { success: true; target: string; resolvedIps: string[] }
+  | { success: false; error: string }
+> {
+  const parseResult = targetSchema.safeParse(rawTarget);
+  if (!parseResult.success) {
+    return { success: false, error: parseResult.error.issues?.[0]?.message || 'Target non valido' };
+  }
+  const cleanTarget = parseResult.data;
+  const validation = await validateExternalTarget(cleanTarget);
+  if (!validation.isValid) {
+    return { success: false, error: validation.error || 'SSRF Protection: target non consentito' };
+  }
+  return { success: true, target: cleanTarget, resolvedIps: validation.resolvedIps };
+}
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import net from 'net';
-import { targetSchema } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
 
 const COMMON_PORTS = [80, 443, 22, 21, 25, 3306, 5432, 8080];
 
@@ -31,21 +31,23 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const target = searchParams.get('target');
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+
+  const cleanTarget = validation.target;
 
   try {
     const results = await Promise.all(
       COMMON_PORTS.map(async (port) => ({
         port,
-        open: await checkPort(target!, port)
+        open: await checkPort(cleanTarget, port)
       }))
     );
 
     return NextResponse.json({
-      target,
+      target: cleanTarget,
       ports: results
     });
   } catch (error) {

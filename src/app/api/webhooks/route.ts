@@ -9,7 +9,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   await ensureTables();
   const session = await getSession();
-  const userId = session?.userId || 'guest';
+  if (!session) {
+    return NextResponse.json({ error: 'Autenticazione richiesta' }, { status: 401 });
+  }
+  const userId = session.userId;
 
   try {
     const result = await db.execute({
@@ -39,7 +42,6 @@ export async function GET() {
 export async function POST(req: Request) {
   await ensureTables();
   const session = await getSession();
-  const userId = session?.userId || 'guest';
 
   try {
     const body = await req.json();
@@ -69,6 +71,11 @@ export async function POST(req: Request) {
     }
 
     // Altrimenti è creazione di un webhook config
+    if (!session) {
+      return NextResponse.json({ error: 'Autenticazione richiesta' }, { status: 401 });
+    }
+    const userId = session.userId;
+
     if (!name || !url) {
       return NextResponse.json({ error: 'Nome e URL sono campi obbligatori' }, { status: 400 });
     }

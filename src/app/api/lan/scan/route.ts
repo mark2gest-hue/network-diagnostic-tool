@@ -4,6 +4,8 @@ import net from 'net';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
+import { getSession } from '@/lib/auth';
+
 const execAsync = promisify(exec);
 
 export const dynamic = 'force-dynamic';
@@ -19,8 +21,8 @@ interface DiscoveredDevice {
   isSelf: boolean;
 }
 
-// Controllo rapido socket su una porta per rilevare host attivo
-function probePort(ip: string, port: number, timeout = 350): Promise<{ open: boolean; latency: number }> {
+// Controllo non invasivo singolo host/porta con timeout breve
+function probePort(ip: string, port: number, timeout = 300): Promise<{ open: boolean; latency: number }> {
   return new Promise((resolve) => {
     const start = Date.now();
     const socket = new net.Socket();
@@ -44,7 +46,7 @@ function probePort(ip: string, port: number, timeout = 350): Promise<{ open: boo
   });
 }
 
-// Lettura e parsing della tabella ARP del sistema operativo (Mac/Linux/Windows)
+// Lettura passiva e parsing della tabella ARP già presente nel sistema operativo
 async function getArpTable(): Promise<Map<string, string>> {
   const arpMap = new Map<string, string>();
   try {
@@ -52,7 +54,6 @@ async function getArpTable(): Promise<Map<string, string>> {
     const lines = stdout.split('\n');
 
     for (const line of lines) {
-      // Regex per estrarre IP e MAC: match di (192.168.1.1) at 00:11:22:33:44:55
       const ipMatch = line.match(/\(?((?:[0-9]{1,3}\.){3}[0-9]{1,3})\)?/);
       const macMatch = line.match(/((?:[0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2})/);
 
@@ -65,83 +66,61 @@ async function getArpTable(): Promise<Map<string, string>> {
       }
     }
   } catch {
-    // ARP command non disponibile o errore non bloccante
+    // ARP command non disponibile o ambiente restrittivo
   }
   return arpMap;
 }
 
 export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Autenticazione richiesta per accedere alla diagnostica di rete host' }, { status: 401 });
+  }
+
   try {
     const interfaces = os.networkInterfaces();
     let primaryInterface: { name: string; ip: string; netmask: string; mac: string } | null = null;
 
-    // Trova l'interfaccia WiFi o LAN attiva (esclude localhost e IPv6)
+    // Trova l'interfaccia attiva
     for (const [name, netList] of Object.entries(interfaces)) {
       if (!netList) continue;
       for (const iface of netList) {
         if (!iface.internal && iface.family === 'IPv4' && iface.address !== '127.0.0.1') {
-          // Preferisci en0/wlan0/eth0/Wi-Fi
           primaryInterface = {
             name,
             ip: iface.address,
             netmask: iface.netmask,
             mac: iface.mac.toUpperCase()
           };
-          if (name.includes('en0') || name.includes('wlan') || name.includes('Wi-Fi')) {
+          if (name.includes('en0') || name.includes('wlan') || name.includes('eth0') || name.includes('Wi-Fi')) {
             break;
           }
         }
       }
-      if (primaryInterface && (primaryInterface.name.includes('en0') || primaryInterface.name.includes('wlan'))) {
+      if (primaryInterface && (primaryInterface.name.includes('en0') || primaryInterface.name.includes('wlan') || primaryInterface.name.includes('eth0'))) {
         break;
       }
     }
 
     if (!primaryInterface) {
       return NextResponse.json({
-        error: 'Nessuna interfaccia di rete attiva rilevata.'
+        error: 'Nessuna interfaccia di rete attiva rilevata sull\'ambiente host.'
       }, { status: 404 });
     }
 
     const selfIp = primaryInterface.ip;
     const ipParts = selfIp.split('.').map(Number);
     const baseSubnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-    const gatewayIp = `${baseSubnet}.1`; // Gateway comune su subnet domestiche /24
+    const gatewayIp = `${baseSubnet}.1`;
 
-    // 1. Leggiamo la tabella ARP
+    // 1. Lettura passiva e sicura della tabella ARP (senza scansioni invasive a ventaglio)
     const arpTable = await getArpTable();
 
-    // 2. Eseguiamo una scansione rapida a ventaglio sulle prime 30 e principali porte/IP della subnet
-    const commonIps: string[] = [gatewayIp];
-    for (let i = 1; i <= 40; i++) {
-      commonIps.push(`${baseSubnet}.${i}`);
-    }
-    // Aggiungi IP già presenti in ARP o vicini
-    arpTable.forEach((_, ip) => {
-      if (!commonIps.includes(ip) && ip.startsWith(baseSubnet)) {
-        commonIps.push(ip);
-      }
-    });
+    // 2. Controllo porta gateway rapido e non invasivo
+    const gwProbe = await probePort(gatewayIp, 80, 200);
+    const isGwReachable = gwProbe.open || arpTable.has(gatewayIp);
 
-    const probePorts = [80, 443, 22, 53, 8080, 5353];
-    const activeIps = new Set<string>([selfIp]);
-
-    // Scansione parallela non invasiva
-    await Promise.allSettled(
-      commonIps.map(async (targetIp) => {
-        if (targetIp === selfIp) return;
-        for (const port of probePorts) {
-          const res = await probePort(targetIp, port, 250);
-          if (res.open) {
-            activeIps.add(targetIp);
-            break;
-          }
-        }
-      })
-    );
-
-    // Rileggi ARP dopo aver popolato la cache di rete
-    const updatedArp = await getArpTable();
+    const updatedArp = arpTable;
 
     const devices: DiscoveredDevice[] = [];
 
@@ -156,8 +135,8 @@ export async function GET() {
       latency: 0
     });
 
-    // Aggiungiamo il Gateway se trovato o presente
-    if (updatedArp.has(gatewayIp) || activeIps.has(gatewayIp)) {
+    // Aggiungiamo il Gateway se presente o raggiungibile
+    if (updatedArp.has(gatewayIp) || isGwReachable) {
       devices.push({
         ip: gatewayIp,
         mac: updatedArp.get(gatewayIp) || 'N/A',

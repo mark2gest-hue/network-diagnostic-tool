@@ -110,7 +110,7 @@ export function LanScanner() {
             </h3>
           </div>
           <p className="text-xs text-zinc-400 max-w-2xl">
-            Rileva automaticamente la scheda attiva (WiFi o Cavo Ethernet), l&apos;IP locale, il Gateway del router e scansiona la tabella ARP della subnet per scoprire tutti i dispositivi connessi.
+            Rileva l&apos;interfaccia di rete host attiva, l&apos;IP locale, il Gateway e legge la tabella ARP di sistema per mappare i nodi noti (richiede account autenticato).
           </p>
         </div>
 

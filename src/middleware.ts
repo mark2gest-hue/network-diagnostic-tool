@@ -5,23 +5,22 @@ import { getJwtSecret } from './lib/constants';
 
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('session')?.value;
-  
-  // For debugging
-  if (request.nextUrl.pathname.startsWith('/api/auth/me')) {
-    console.log(`Middleware: ${request.nextUrl.pathname}, token present: ${!!token}`);
-  }
+  const path = request.nextUrl.pathname;
 
-  // We only protect a few routes if needed, otherwise we just attach the user info
-  if (request.nextUrl.pathname.startsWith('/api/history')) {
+  // Proteggi GET su /api/history e /api/history/diff
+  const isProtectedHistory = (path === '/api/history' && request.method === 'GET') || path.startsWith('/api/history/diff');
+  const isProtectedAssetOrWebhook = path.startsWith('/api/assets') || path.startsWith('/api/webhooks');
+
+  if (isProtectedHistory || isProtectedAssetOrWebhook) {
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: login richiesto' }, { status: 401 });
     }
 
     try {
       await jwtVerify(token, getJwtSecret());
       return NextResponse.next();
     } catch {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: token non valido' }, { status: 401 });
     }
   }
 
@@ -29,5 +28,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/history/:path*', '/api/auth/me'],
+  matcher: ['/api/history/:path*', '/api/assets/:path*', '/api/webhooks/:path*', '/api/auth/me'],
 };

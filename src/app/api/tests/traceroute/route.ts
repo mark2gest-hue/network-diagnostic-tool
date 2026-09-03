@@ -68,34 +68,19 @@ export async function GET(req: Request) {
       }
     }
 
-    // Se il traceroute CLI fallisce o ritorna pochi hop, generiamo la catena iniziale
-    if (hops.length === 0) {
-      hops.push(
-        { hop: 1, ip: '192.168.1.1', host: 'Gateway Locale', latency: 1.2 },
-        { hop: 2, ip: '10.0.0.1', host: 'ISP Edge Gateway', latency: 8.5 },
-        { hop: 3, ip: cleanTarget, host: cleanTarget, latency: 24.3 }
-      );
-    }
-
     return NextResponse.json({
       target: cleanTarget,
       totalHops: hops.length,
       hops,
-      destinationReached: hops.some(h => h.ip === cleanTarget || h.host.includes(cleanTarget))
+      destinationReached: hops.some(h => h.ip === cleanTarget || h.host.includes(cleanTarget)),
+      status: hops.length > 0 ? 'pass' : 'warning',
+      message: hops.length > 0
+        ? `Traceroute completato con successo (${hops.length} hop rilevati).`
+        : 'Nessun nodo intermedio ha risposto con pacchetti ICMP Time Exceeded entro il timeout.'
     });
   } catch {
-    // Fallback controllato
-    const fallbackHops: TracerouteHop[] = [
-      { hop: 1, ip: '192.168.1.1', host: 'Gateway Locale', latency: 1.1 },
-      { hop: 2, ip: 'ISP Backbone Edge', host: 'ISP Backbone Edge', latency: 9.4 },
-      { hop: 3, ip: cleanTarget, host: cleanTarget, latency: 22.8 }
-    ];
-
     return NextResponse.json({
-      target: cleanTarget,
-      totalHops: fallbackHops.length,
-      hops: fallbackHops,
-      destinationReached: true
-    });
+      error: 'Comando traceroute CLI non disponibile sull\'ambiente di hosting o timeout scaduto.'
+    }, { status: 503 });
   }
 }

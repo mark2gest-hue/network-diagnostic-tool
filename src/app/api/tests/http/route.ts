@@ -4,12 +4,14 @@ import { targetSchema } from '@/lib/validators';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const target = searchParams.get('target');
-  const url = target!.startsWith('http') ? target! : `https://${target}`;
 
   const validation = targetSchema.safeParse(target);
   if (!validation.success) {
     return NextResponse.json({ error: validation.error.message }, { status: 400 });
   }
+
+  const cleanTarget = validation.data;
+  const url = cleanTarget.startsWith('http') ? cleanTarget : `https://${cleanTarget}`;
 
   try {
     const startTime = Date.now();

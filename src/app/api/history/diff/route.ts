@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getSession } from '@/lib/auth';
 import { extractFindingsFromResults, calculateRiskAssessment } from '@/lib/risk-engine';
 
 import { computeScanDiff } from '@/lib/diff-engine';
@@ -15,11 +16,15 @@ export async function POST(req: Request) {
     let currSnapshot: ScanSnapshot | null = null;
 
     if (previousId && currentId) {
-      // Fetch both from db
-      const result = await db.execute({
+      const session = await getSession();
+      if (!session) {
+        return NextResponse.json({ error: 'Autenticazione richiesta' }, { status: 401 });
+      }
 
-        sql: 'SELECT id, target, results, created_at FROM test_history WHERE id IN (?, ?)',
-        args: [previousId, currentId],
+      // Fetch both from db with user isolation (anti-IDOR)
+      const result = await db.execute({
+        sql: 'SELECT id, target, results, created_at FROM test_history WHERE id IN (?, ?) AND user_id = ?',
+        args: [previousId, currentId, session.userId],
       });
 
       const rows = result.rows;

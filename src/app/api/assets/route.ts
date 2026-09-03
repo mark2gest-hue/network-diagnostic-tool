@@ -9,7 +9,10 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   await ensureTables();
   const session = await getSession();
-  const userId = session?.userId || 'guest';
+  if (!session) {
+    return NextResponse.json({ error: 'Autenticazione richiesta' }, { status: 401 });
+  }
+  const userId = session.userId;
 
   try {
     const result = await db.execute({
@@ -40,7 +43,10 @@ export async function GET() {
 export async function POST(req: Request) {
   await ensureTables();
   const session = await getSession();
-  const userId = session?.userId || 'guest';
+  if (!session) {
+    return NextResponse.json({ error: 'Autenticazione richiesta' }, { status: 401 });
+  }
+  const userId = session.userId;
 
   try {
     const body = await req.json();
@@ -82,7 +88,10 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   await ensureTables();
   const session = await getSession();
-  const userId = session?.userId || 'guest';
+  if (!session) {
+    return NextResponse.json({ error: 'Autenticazione richiesta' }, { status: 401 });
+  }
+  const userId = session.userId;
 
   try {
     const { searchParams } = new URL(req.url);
@@ -92,9 +101,10 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'ID asset mancante' }, { status: 400 });
     }
 
+    // Un utente può cancellare solo i propri asset, mai quelli demo
     await db.execute({
-      sql: 'DELETE FROM assets WHERE id = ? AND (user_id = ? OR user_id = ?)',
-      args: [id, userId, 'demo'],
+      sql: 'DELETE FROM assets WHERE id = ? AND user_id = ?',
+      args: [id, userId],
     });
 
     return NextResponse.json({ success: true, deletedId: id });

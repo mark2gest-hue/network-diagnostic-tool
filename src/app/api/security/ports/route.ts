@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import net from 'net';
-import { targetSchema } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,13 +31,13 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   try {
-    const validatedTarget = validation.data;
+    const validatedTarget = validation.target;
     const results = await Promise.all(
       RISKY_PORTS.map(async (p) => ({
         ...p,

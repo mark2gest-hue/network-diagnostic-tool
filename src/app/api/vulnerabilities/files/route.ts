@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { targetSchema } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +19,12 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedTarget = validation.data;
+  const validatedTarget = validation.target;
   const baseUrl = validatedTarget.startsWith('http') ? validatedTarget : `https://${validatedTarget}`;
   const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 

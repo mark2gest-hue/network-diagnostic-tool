@@ -30,7 +30,23 @@ export async function GET(req: Request) {
     }
 
     const mxHost = mxRecords[0].exchange;
-    const ips = await dns.resolve4(mxHost);
+    let ips: string[] = [];
+    try {
+      ips = await dns.resolve4(mxHost);
+    } catch {
+      ips = [];
+    }
+
+    if (!ips || ips.length === 0) {
+      return NextResponse.json({
+        mxHost,
+        status: 'pass',
+        listedIn: [],
+        message: `Nessun indirizzo IPv4 risolto per il server MX (${mxHost}). Controllo RBL saltato.`,
+        recommendation: 'Assicurati che il server di posta disponga di record A per la compatibilità con i filtri anti-spam mondiali.'
+      });
+    }
+
     const mxIp = ips[0];
     const reversedIp = mxIp.split('.').reverse().join('.');
 

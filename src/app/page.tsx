@@ -16,7 +16,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Globe, Wifi, ShieldCheck, Flame, BookOpen, Zap } from 'lucide-react';
 import { calculateRiskAssessment } from '@/lib/risk-engine';
 import { RiskAssessment, ScanDiffResult } from '@/types/findings';
-import { DemoScenario, DEMO_SCENARIOS } from '@/lib/demo-scenarios';
+import { DemoScenario } from '@/lib/demo-scenarios';
 import { Asset } from '@/types/assets';
 
 type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities' | 'manual';
@@ -24,7 +24,7 @@ type TabType = 'external' | 'internal' | 'security' | 'vulnerabilities' | 'manua
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('external');
   const [currentTarget, setCurrentTarget] = useState<string>('google.com');
-  const [activeScenario, setActiveScenario] = useState<DemoScenario | null>(DEMO_SCENARIOS.ecommerce_drift);
+  const [activeScenario, setActiveScenario] = useState<DemoScenario | null>(null);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [diffViewerOpen, setDiffViewerOpen] = useState(false);
   const [assetModalOpen, setAssetModalOpen] = useState(false);
