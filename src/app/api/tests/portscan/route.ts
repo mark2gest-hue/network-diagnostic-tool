@@ -37,17 +37,22 @@ export async function GET(req: Request) {
   }
 
   const cleanTarget = validation.target;
+  // Fix Critico TOCTOU / DNS Rebinding: se abbiamo un IP validato, effettuiamo la connessione diretta su di esso
+  const ipToConnect = (validation.resolvedIps && validation.resolvedIps.length > 0)
+    ? validation.resolvedIps[0]
+    : cleanTarget;
 
   try {
     const results = await Promise.all(
       COMMON_PORTS.map(async (port) => ({
         port,
-        open: await checkPort(cleanTarget, port)
+        open: await checkPort(ipToConnect, port)
       }))
     );
 
     return NextResponse.json({
       target: cleanTarget,
+      resolvedIp: ipToConnect,
       ports: results
     });
   } catch (error) {

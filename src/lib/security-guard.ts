@@ -66,15 +66,37 @@ export function isPrivateOrReservedIP(ip: string): boolean {
   // IPv6 checks
   if (net.isIPv6(ip)) {
     const normalized = ip.toLowerCase();
-    // Loopback & Unspecified
-    if (normalized === '::1' || normalized === '::') return true;
-    // IPv4-mapped IPv6 (::ffff:127.0.0.1)
-    if (normalized.startsWith('::ffff:')) {
-      const ipv4Part = normalized.substring(7);
-      if (net.isIPv4(ipv4Part)) {
-        return isPrivateOrReservedIP(ipv4Part);
+
+    // Loopback & Unspecified (comprese forme estese 0:0:0:0:0:0:0:1 e ::1)
+    if (
+      normalized === '::1' ||
+      normalized === '::' ||
+      normalized === '0:0:0:0:0:0:0:1' ||
+      normalized === '0:0:0:0:0:0:0:0'
+    ) {
+      return true;
+    }
+
+    // IPv4-mapped IPv6 (forme standard ed estese)
+    if (normalized.includes('ffff:')) {
+      const parts = normalized.split('ffff:');
+      const lastPart = parts[parts.length - 1];
+      if (net.isIPv4(lastPart)) {
+        return isPrivateOrReservedIP(lastPart);
+      }
+      // Hex format (es. 7f00:1 o a9fe:a9fe)
+      const hexMatch = lastPart.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+      if (hexMatch) {
+        const p1 = parseInt(hexMatch[1], 16);
+        const p2 = parseInt(hexMatch[2], 16);
+        const b1 = (p1 >> 8) & 0xff;
+        const b2 = p1 & 0xff;
+        const b3 = (p2 >> 8) & 0xff;
+        const b4 = p2 & 0xff;
+        return isPrivateOrReservedIP(`${b1}.${b2}.${b3}.${b4}`);
       }
     }
+
     // Unique Local Addresses (fc00::/7 -> fc00 to fdff)
     if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
     // Link-Local Unicast (fe80::/10)
@@ -120,8 +142,15 @@ export interface TargetValidationResult {
 }
 
 /**
- * Valida un target (IP o Dominio) verificando che esista, sia sintatticamente corretto
- * e non risolva verso IP privati o metadati cloud (protezione completa da SSRF e DNS rebinding).
+ * Modalità locale sul campo: permette di diagnosticare server, router, NAS e IP privati
+ * dei clienti (192.168.x.x, 10.x.x.x, localhost, .local) SOLO se abilitata esplicitamente.
+ * Sicurezza fail-closed: disattivata di default in produzione.
+ */
+export const ALLOW_LOCAL_DIAGNOSTICS = process.env.ALLOW_LOCAL_DIAGNOSTICS?.toLowerCase() === 'true';
+
+/**
+ * Valida un target (IP o Dominio) verificando che esista e sia sintatticamente corretto.
+ * Se ALLOW_LOCAL_DIAGNOSTICS è attivo (default), consente liberamente IP privati, apparati di rete e localhost.
  */
 export async function validateExternalTarget(rawTarget: string): Promise<TargetValidationResult> {
   const target = rawTarget.trim();
@@ -136,8 +165,29 @@ export async function validateExternalTarget(rawTarget: string): Promise<TargetV
     };
   }
 
-  // Controllo se è un hostname interno esplicito
-  if (isInternalHostname(target)) {
+  // Se siamo in modalità diagnostica locale (sul campo da clienti), permettiamo host interni e IP privati
+  if (ALLOW_LOCAL_DIAGNOSTICS) {
+    if (net.isIP(target)) {
+      return {
+        isValid: true,
+        isPublic: !isPrivateOrReservedIP(target),
+        target,
+        resolvedIps: [target],
+      };
+    }
+
+    if (target.toLowerCase() === 'localhost' || target.toLowerCase().endsWith('.local') || target.toLowerCase().endsWith('.lan')) {
+      return {
+        isValid: true,
+        isPublic: false,
+        target,
+        resolvedIps: target.toLowerCase() === 'localhost' ? ['127.0.0.1'] : [],
+      };
+    }
+  }
+
+  // Controllo se è un hostname interno esplicito (solo se non consentito)
+  if (!ALLOW_LOCAL_DIAGNOSTICS && isInternalHostname(target)) {
     return {
       isValid: false,
       isPublic: false,
@@ -149,18 +199,18 @@ export async function validateExternalTarget(rawTarget: string): Promise<TargetV
 
   // Se è già un IP letterale
   if (net.isIP(target)) {
-    if (isPrivateOrReservedIP(target)) {
+    if (!ALLOW_LOCAL_DIAGNOSTICS && isPrivateOrReservedIP(target)) {
       return {
         isValid: false,
         isPublic: false,
         target,
         resolvedIps: [target],
-        error: `Accesso bloccato per sicurezza (SSRF): L'indirizzo IP ${target} appartiene a un range privato o riservato (RFC 1918 / Cloud Metadata).`,
+        error: `Accesso bloccato per sicurezza (SSRF): L'indirizzo IP ${target} appartiene a un range privato o riservato (RFC 1918).`,
       };
     }
     return {
       isValid: true,
-      isPublic: true,
+      isPublic: !isPrivateOrReservedIP(target),
       target,
       resolvedIps: [target],
     };
