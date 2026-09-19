@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import dns from 'dns/promises';
-import { ipSchema } from '@/lib/validators';
+import { ipSchema, formatZodError } from '@/lib/validators';
 
 const RBL_ZONES = [
   'zen.spamhaus.org',
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
 
   const validation = ipSchema.safeParse(ip);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
   }
 
   try {

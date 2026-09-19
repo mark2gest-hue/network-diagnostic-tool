@@ -1,4 +1,5 @@
 # Regole operative del progetto
+- **Memoria persistente (SESSION_STATE.md)**: All'avvio di ogni sessione o dopo ogni interruzione, consulta immediatamente `SESSION_STATE.md` nella root per riprendere il contesto esatto e aggiornalo a ogni avanzamento significativo.
 
 - **Analizza prima di modificare**: Esamina con attenzione il codice, il contesto e le dipendenze prima di apportare qualsiasi modifica.
 - **Minimizza i file modificati**: Non cambiare più file del necessario; limita il raggio di modifica al minimo indispensabile.
@@ -40,10 +41,4 @@ Le skill sono gestite a livello globale in:
 - `~/.copilot/agents/project-core`
 
 
-# Infrastruttura di Produzione (Oracle Cloud VPS)
-- **Host VPS**: `130.110.10.77` (Ubuntu 24.04 LTS arm64)
-- **SSH Key**: `/Users/marco/Downloads/ssh-key-2026-08-21.key` (User: `ubuntu`)
-- **Cartella App su Server**: `/var/www/gestionale/`
-- **Gestore Processi**: PM2 (`pm2 restart gestionale`)
-- **Web Server & SSL**: Nginx con certificati SSL Let's Encrypt per `vlr-resorts.com`, `www.vlr-resorts.com`, `gestionale.vlr-resorts.com`
-- **Comando Deploy Rapido**: `npm run build && rsync -avz -e "ssh -i /Users/marco/Downloads/ssh-key-2026-08-21.key -o StrictHostKeyChecking=no" dist ubuntu@130.110.10.77:/var/www/gestionale/ && ssh -i /Users/marco/Downloads/ssh-key-2026-08-21.key -o StrictHostKeyChecking=no ubuntu@130.110.10.77 "pm2 restart gestionale"`
+

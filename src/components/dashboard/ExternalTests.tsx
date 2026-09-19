@@ -23,11 +23,14 @@ import {
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { ExportButton } from '../ExportButton';
+import { ExportReportModal } from './ExportReportModal';
+import { FileText } from 'lucide-react';
 
 const PRESET_DOMAINS = ['google.com', 'cloudflare.com', 'github.com', 'microsoft.com'];
 
 export function ExternalTests() {
   const [target, setTarget] = useState('google.com');
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const { results, loading, runTest, runAll } = useExternalTests();
 
   const activeCount = Object.values(loading).filter(Boolean).length;
@@ -61,8 +64,18 @@ export function ExternalTests() {
               className="bg-zinc-900/90 border-zinc-700/70 pl-10 pr-4 py-5 text-white font-mono text-sm focus:ring-2 focus:ring-blue-500 rounded-xl shadow-inner"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <ExportButton externalResults={results} internalResults={{}} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReportModalOpen(true)}
+              disabled={finishedCount === 0}
+              className="border-blue-500/30 bg-blue-950/30 text-blue-300 hover:text-white hover:bg-blue-900/50 rounded-xl"
+            >
+              <FileText className="w-4 h-4 mr-2 text-blue-400" />
+              Report PDF
+            </Button>
             <Button 
               onClick={() => runAll(target)} 
               disabled={activeCount > 0 || !target.trim()}
@@ -112,7 +125,7 @@ export function ExternalTests() {
       )}
 
       {/* Test Cards Grid (12 Diagnostic Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
         <TestCard 
           title="DNS Lookup"
           description="Risoluzione record A, AAAA, MX, TXT"
@@ -210,6 +223,14 @@ export function ExternalTests() {
           onRun={() => runTest('http', target)}
         />
       </div>
+
+      {/* Export Report Modal */}
+      <ExportReportModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        target={target}
+        results={results}
+      />
     </div>
   );
 }

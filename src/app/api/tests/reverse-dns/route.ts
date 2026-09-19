@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import dns from 'dns/promises';
-import { targetSchema } from '@/lib/validators';
+import { targetSchema, formatZodError } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
   const validation = targetSchema.safeParse(target);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
   }
 
   const cleanTarget = validation.data;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import net from 'net';
-import { domainSchema } from '@/lib/validators';
+import { domainSchema, formatZodError } from '@/lib/validators';
 
 function queryWhois(domain: string, server: string = 'whois.iana.org'): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
   const validation = domainSchema.safeParse(domain);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
   }
 
   try {

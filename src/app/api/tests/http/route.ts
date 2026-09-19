@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { targetSchema } from '@/lib/validators';
+import { targetSchema, formatZodError } from '@/lib/validators';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,7 +7,7 @@ export async function GET(req: Request) {
 
   const validation = targetSchema.safeParse(target);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.message }, { status: 400 });
+    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
   }
 
   const cleanTarget = validation.data;

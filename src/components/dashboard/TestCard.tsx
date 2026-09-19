@@ -69,32 +69,32 @@ export function TestCard({ test, loading, onRun, title, description, icon: Custo
 
   return (
     <Card className={cn(
-      "glass-card border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between",
+      "glass-card border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col justify-between h-full",
       config?.glowClass || ''
     )}>
-      <div>
-        <CardHeader className="p-4 sm:p-5 flex flex-row items-start justify-between space-y-0 gap-3 border-b border-zinc-800/50 bg-zinc-900/30">
-          <div className="flex items-start gap-3">
+      <div className="flex-1 flex flex-col min-h-0">
+        <CardHeader className="p-4 flex flex-row items-start justify-between space-y-0 gap-3 border-b border-zinc-800/50 bg-zinc-900/30">
+          <div className="flex items-start gap-2.5 min-w-0 flex-1">
             {CustomIcon && (
-              <div className="p-2 rounded-xl bg-zinc-800/70 border border-zinc-700/50 text-blue-400 mt-0.5">
+              <div className="p-2 rounded-xl bg-zinc-800/70 border border-zinc-700/50 text-blue-400 shrink-0 mt-0.5">
                 <CustomIcon className="w-4 h-4" />
               </div>
             )}
-            <div>
-              <h3 className="text-sm font-bold text-zinc-100 tracking-tight">{title}</h3>
-              {description && <p className="text-xs text-zinc-400 mt-0.5 leading-snug">{description}</p>}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-zinc-100 tracking-tight leading-snug truncate" title={title}>{title}</h3>
+              {description && <p className="text-xs text-zinc-400 mt-0.5 leading-snug line-clamp-2" title={description}>{description}</p>}
             </div>
           </div>
           
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge variant="outline" className={cn('px-2.5 py-0.5 h-6 text-[10px] font-bold uppercase tracking-wider', config?.badgeClass || '')}>
-              <StatusIcon className={cn('mr-1.5 w-3 h-3', normalizedStatus === 'running' && 'animate-spin')} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge variant="outline" className={cn('px-2 py-0.5 h-6 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0', config?.badgeClass || '')}>
+              <StatusIcon className={cn('mr-1 w-3 h-3 shrink-0', normalizedStatus === 'running' && 'animate-spin')} />
               {config?.label || 'In Attesa'}
             </Badge>
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-7 w-7 text-zinc-400 hover:text-white hover:bg-zinc-800/80 rounded-lg transition-colors"
+              className="h-7 w-7 text-zinc-400 hover:text-white hover:bg-zinc-800/80 rounded-lg transition-colors shrink-0"
               onClick={onRun}
               disabled={loading}
               title={`Esegui ${title}`}
@@ -105,14 +105,14 @@ export function TestCard({ test, loading, onRun, title, description, icon: Custo
         </CardHeader>
         
         {test && normalizedStatus !== 'idle' && (
-          <CardContent className="p-4 sm:p-5">
+          <CardContent className="p-4 flex-1 flex flex-col justify-start">
             {test.error ? (
               <div className="text-xs text-red-400 font-mono bg-red-950/30 border border-red-800/40 p-3 rounded-xl flex items-start gap-2">
                 <XCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
-                <span>{test.error}</span>
+                <span className="break-words min-w-0">{test.error}</span>
               </div>
             ) : (
-              <div className="animate-in fade-in duration-300">
+              <div className="animate-in fade-in duration-300 w-full min-w-0">
                 <ResultRenderer testId={test.id} result={test.result} />
               </div>
             )}
