@@ -23,6 +23,7 @@ import autoTable from 'jspdf-autotable';
 
 interface ExecutiveRemediationSummaryProps {
   target: string;
+  perspectiveMode?: 'executive' | 'it-pro';
 }
 
 interface RemediationItem {
@@ -34,10 +35,14 @@ interface RemediationItem {
   businessImpact: string;
   solutionCommand: string;
   solutionType: 'BIND / DNS' | 'Nginx' | 'Firewall / UFW' | 'Cloudflare';
+  mitreDefend?: string;
+  cwe?: string;
+  nistCsf?: string;
 }
 
-export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSummaryProps) {
+export function ExecutiveRemediationSummary({ target, perspectiveMode = 'executive' }: ExecutiveRemediationSummaryProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedBrief, setCopiedBrief] = useState(false);
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
 
   const copyToClipboard = (text: string, id: string) => {
@@ -91,6 +96,9 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
       businessImpact: 'Mancata conformità con le direttive Google/Yahoo 2024 e mancata protezione anti-phishing.',
       solutionType: 'BIND / DNS',
       solutionCommand: `_dmarc.${target}. IN TXT "v=DMARC1; p=quarantine; sp=quarantine; pct=100; rua=mailto:dmarc-reports@${target}; aspf=r;"`,
+      mitreDefend: 'D3-MHA',
+      cwe: 'CWE-345',
+      nistCsf: 'PR.DS-6',
     },
     {
       id: 'fix-dkim',
@@ -101,6 +109,9 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
       businessImpact: 'Firma crittografica non convalidabile da alcuni provider di posta selettivi.',
       solutionType: 'BIND / DNS',
       solutionCommand: `google._domainkey.${target}. IN TXT "v=DKIM1; k=rsa; p=CHIAVE_PUBBLICA_DKIM..."`,
+      mitreDefend: 'D3-MHA',
+      cwe: 'CWE-345',
+      nistCsf: 'PR.DS-6',
     },
     {
       id: 'fix-csp',
@@ -111,6 +122,9 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
       businessImpact: 'Rischio potenziale di Cross-Site Scripting (XSS) in caso di inclusioni esterne.',
       solutionType: 'Nginx',
       solutionCommand: `add_header Content-Security-Policy "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';" always;`,
+      mitreDefend: 'D3-AHC',
+      cwe: 'CWE-79',
+      nistCsf: 'PR.PT-1',
     },
     {
       id: 'fix-waf',
@@ -121,6 +135,9 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
       businessImpact: 'Vulnerabilità a flood volumetrici e scansioni automatizzate di botnet.',
       solutionType: 'Cloudflare',
       solutionCommand: `# Abilitare Proxy Cloudflare (Orange Cloud) sui record A di ${target}\n# Impostare Security Level su 'Medium' o 'High' e WAF Rate Limiting`,
+      mitreDefend: 'D3-NTF',
+      cwe: 'CWE-400',
+      nistCsf: 'PR.AC-5',
     },
     {
       id: 'fix-ssh',
@@ -131,6 +148,9 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
       businessImpact: 'Tentativi di brute-force automatici nei log di sistema.',
       solutionType: 'Firewall / UFW',
       solutionCommand: `sudo ufw limit 22/tcp\n# Oppure restringi solo all'IP del tuo ufficio:\n# sudo ufw allow from <TUO_IP_UFFICIO> to any port 22 proto tcp`,
+      mitreDefend: 'D3-NTF',
+      cwe: 'CWE-284',
+      nistCsf: 'PR.AC-4',
     },
   ];
 
@@ -214,6 +234,7 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
     const remediationTableData = remediationList.map(r => [
       r.severity.toUpperCase(),
       r.title,
+      `${r.mitreDefend || 'D3-AHA'} / ${r.cwe || 'N/A'}`,
       r.solutionType,
       r.businessImpact,
       r.solutionCommand
@@ -221,17 +242,18 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
 
     autoTable(doc, {
       startY: 38,
-      head: [['Priorità', 'Intervento', 'Tecnologia', 'Impatto di Business', 'Configurazione / Snippet']],
+      head: [['Priorità', 'Intervento', 'MITRE / CWE', 'Tecnologia', 'Impatto di Business', 'Configurazione / Snippet']],
       body: remediationTableData,
       theme: 'grid',
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
       styles: { fontSize: 7, cellPadding: 2.5 },
       columnStyles: {
-        0: { cellWidth: 18, fontStyle: 'bold' },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 45 },
-        4: { cellWidth: 'auto', fontStyle: 'italic' },
+        0: { cellWidth: 16, fontStyle: 'bold' },
+        1: { cellWidth: 36 },
+        2: { cellWidth: 24, fontStyle: 'bold' },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 40 },
+        5: { cellWidth: 'auto', fontStyle: 'italic' },
       }
     });
 
@@ -273,16 +295,24 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
       <div className="bg-[#0b101c] border border-[#1d2b42] rounded-md p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#00f0ff] bg-[#0284c7]/20 border border-[#0369a1] px-2.5 py-0.5 rounded">
-              EXECUTIVE AUDIT & CONTEXTUAL REPORT
+            <span className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded border ${
+              perspectiveMode === 'executive'
+                ? 'text-[#00f0ff] bg-[#0284c7]/20 border-[#0369a1]'
+                : 'text-[#38bdf8] bg-[#1e3a8a]/30 border-[#2563eb]'
+            }`}>
+              {perspectiveMode === 'executive' ? '👔 PROSPETTIVA DIREZIONE (SINTESI BUSINESS)' : '💻 CONSOLE SOC & IT ENGINEERING (DETTAGLIO TECNICO)'}
             </span>
             <span className="text-xs text-[#94a3b8]">Target: <strong className="text-white">{target}</strong></span>
           </div>
           <h2 className="text-lg font-bold text-white tracking-tight">
-            Rapporto Esecutivo di Sicurezza con Valutazione Operativa dei Rischi
+            {perspectiveMode === 'executive'
+              ? 'Quadro di Sintesi Esecutiva & Postura di Rischio Aziendale'
+              : 'Console Diagnostica Operativa & Vulnerability Hardening Matrix'}
           </h2>
           <p className="text-xs text-[#94a3b8]">
-            Analisi contestualizzata che differenzia le configurazioni fisiologiche ordinarie dai reali rischi di vulnerabilità.
+            {perspectiveMode === 'executive'
+              ? 'Visione semplificata a semaforo: zero comandi complessi, solo impatto sui costi, sicurezza e azioni per il team IT.'
+              : 'Dettaglio a basso livello: codici MITRE ATT&CK/D3FEND, direttive CWE, configurazioni Nginx/UFW e pacchetti.'}
           </p>
         </div>
 
@@ -529,6 +559,16 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
                   <span className="text-[10px] bg-[#1e293b] text-[#94a3b8] px-2 py-0.5 rounded font-mono">
                     {item.solutionType}
                   </span>
+                  {item.mitreDefend && (
+                    <span className="text-[10px] bg-[#0284c7]/20 text-[#38bdf8] border border-[#0369a1] px-1.5 py-0.5 rounded font-mono font-bold">
+                      MITRE: {item.mitreDefend}
+                    </span>
+                  )}
+                  {item.cwe && (
+                    <span className="text-[10px] bg-[#1e293b] text-[#cbd5e1] border border-[#334155] px-1.5 py-0.5 rounded font-mono">
+                      {item.cwe}
+                    </span>
+                  )}
                   <h4 className="font-bold text-white tracking-wide">{item.title}</h4>
                 </div>
 
@@ -552,12 +592,22 @@ export function ExecutiveRemediationSummary({ target }: ExecutiveRemediationSumm
                 </div>
               </div>
 
-              {/* Code Snippet Box */}
-              <div className="bg-[#050811] p-2.5 rounded border border-[#141d2e] overflow-x-auto">
-                <code className="text-[11px] font-mono text-[#00f0ff] whitespace-pre-wrap block">
-                  {item.solutionCommand}
-                </code>
-              </div>
+              {/* Code Snippet Box visibile solo in modalità IT Pro */}
+              {perspectiveMode === 'it-pro' ? (
+                <div className="bg-[#050811] p-2.5 rounded border border-[#141d2e] overflow-x-auto">
+                  <span className="text-[10px] text-[#64748b] font-bold block mb-1">SNIPPET CONFIGURAZIONE / CLI:</span>
+                  <code className="text-[11px] font-mono text-[#00f0ff] whitespace-pre-wrap block">
+                    {item.solutionCommand}
+                  </code>
+                </div>
+              ) : (
+                <div className="bg-[#050811] p-2.5 rounded border border-[#141d2e] flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-[#38bdf8]">
+                    <strong className="text-white">Azione Direzionale:</strong> Inoltrare questa richiesta al responsabile dei sistemi per applicare la patch su {item.solutionType}.
+                  </div>
+                  <span className="text-[10px] text-[#94a3b8] font-mono shrink-0">Codice fix disponibile in vista IT Pro</span>
+                </div>
+              )}
             </div>
           ))}
         </div>

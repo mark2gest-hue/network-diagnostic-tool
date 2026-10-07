@@ -348,9 +348,14 @@ export function ResultRenderer({ result }: ResultRendererProps) {
                       <span className="font-bold text-red-300 truncate" title={file.path}>{file.path}</span>
                       <span className="text-[10px] text-zinc-400 truncate">{file.detail || file.label}</span>
                     </div>
-                    <Badge variant="outline" className="text-[9px] uppercase bg-red-500/20 border-red-500/50 text-red-300 shrink-0 whitespace-nowrap">
-                      {file.risk || 'High'}
-                    </Badge>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[8px] bg-red-950/60 text-red-300 border border-red-500/40 px-1 py-0.2 rounded font-mono font-bold" title="MITRE D3FEND: D3-AHA / CWE-538">
+                        D3-AHA
+                      </span>
+                      <Badge variant="outline" className="text-[9px] uppercase bg-red-500/20 border-red-500/50 text-red-300 whitespace-nowrap">
+                        {file.risk || 'High'}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -512,33 +517,45 @@ export function ResultRenderer({ result }: ResultRendererProps) {
         <div className="grid grid-cols-2 gap-2 text-xs">
           {portsList.map((p, i) => {
             const isOpen = p.open;
+            const isSensitive = [3306, 5432, 21, 25].includes(p.port);
             return (
               <div 
                 key={i} 
                 className={cn(
                   'flex items-center justify-between px-2.5 py-1.5 rounded-lg border font-mono transition-all gap-1.5 min-w-0',
-                  isOpen 
+                  isOpen && isSensitive
+                    ? 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                    : isOpen 
                     ? 'bg-emerald-950/25 border-emerald-500/30 text-emerald-300' 
                     : 'bg-zinc-950/40 border-zinc-800/80 text-zinc-500'
                 )}
               >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', isOpen ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-zinc-600')} />
+                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', isOpen && isSensitive ? 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]' : isOpen ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-zinc-600')} />
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="font-bold text-xs leading-tight">{p.port}</span>
                     <span className="text-[9px] opacity-70 truncate leading-none mt-0.5">{portLabels[p.port] || 'Port'}</span>
                   </div>
                 </div>
-                <span 
-                  className={cn(
-                    'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 whitespace-nowrap',
-                    isOpen 
-                      ? 'border border-emerald-500/40 bg-emerald-500/20 text-emerald-300' 
-                      : 'border border-zinc-800 bg-zinc-900 text-zinc-500'
+                <div className="flex items-center gap-1">
+                  {isOpen && isSensitive && (
+                    <span className="text-[8px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1 py-0.2 rounded font-mono font-bold" title="MITRE D3FEND: D3-NTF (Network Traffic Filtering)">
+                      D3-NTF
+                    </span>
                   )}
-                >
-                  {isOpen ? 'Open' : 'Closed'}
-                </span>
+                  <span 
+                    className={cn(
+                      'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 whitespace-nowrap',
+                      isOpen && isSensitive
+                        ? 'border border-rose-500/50 bg-rose-500/20 text-rose-300'
+                        : isOpen 
+                        ? 'border border-emerald-500/40 bg-emerald-500/20 text-emerald-300' 
+                        : 'border border-zinc-800 bg-zinc-900 text-zinc-500'
+                    )}
+                  >
+                    {isOpen ? 'Open' : 'Closed'}
+                  </span>
+                </div>
               </div>
             );
           })}

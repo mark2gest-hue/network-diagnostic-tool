@@ -2,6 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useExternalTests } from '@/hooks/useExternalTests';
+import { useInternalTests } from '@/hooks/useInternalTests';
+import { useSecurityAudit } from '@/hooks/useSecurityAudit';
+import { useVulnerabilityScan } from '@/hooks/useVulnerabilityScan';
 import { ResultRenderer } from '@/components/dashboard/ResultRenderer';
 import { ExportReportModal } from '@/components/dashboard/ExportReportModal';
 import { InternalTests } from '@/components/dashboard/InternalTests';
@@ -9,6 +12,7 @@ import { SecurityAudit } from '@/components/dashboard/SecurityAudit';
 import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
 import { ManualSection } from '@/components/dashboard/ManualSection';
 import { ExecutiveRemediationSummary } from '@/components/dashboard/ExecutiveRemediationSummary';
+import { ActiveDefenseModal } from '@/components/dashboard/ActiveDefenseModal';
 import {
   Globe,
   ShieldCheck,
@@ -152,6 +156,9 @@ export default function Dashboard() {
   }, [isDropdownOpen]);
 
   const { results, loading, runTest, runAll } = useExternalTests();
+  const internalSuite = useInternalTests();
+  const securitySuite = useSecurityAudit();
+  const vulnerabilitySuite = useVulnerabilityScan();
 
   const activeCount = Object.values(loading).filter(Boolean).length;
   const finishedCount = Object.values(results).filter(
@@ -217,6 +224,9 @@ export default function Dashboard() {
     );
   };
 
+  const [perspectiveMode, setPerspectiveMode] = useState<'executive' | 'it-pro'>('executive');
+  const [showActiveDefenseModal, setShowActiveDefenseModal] = useState<boolean>(false);
+
   const navTabs: Array<{ id: MainSectionTab; label: string; sublabel: string; icon: React.ElementType; badge?: string }> = [
     { id: 'remediation', label: 'Riepilogo & Bonifica', sublabel: 'Score, Grafici & Download PDF', icon: BarChart3, badge: 'EXECUTIVE' },
     { id: 'external', label: 'External Diagnostics', sublabel: 'DNS Anycast, TTFB, SSL, Port Scanner', icon: Globe, badge: '12 MODULI' },
@@ -231,29 +241,57 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-[#d1d5db] font-mono selection:bg-[#00f0ff] selection:text-black antialiased pb-12">
-      {/* Clean HUD Navigation Bar with Dropdown Selector */}
+      {/* Clean HUD Navigation Bar with Dropdown Selector & Dual-View Switch */}
       <nav className="bg-[#090d16] border-b border-[#192336] px-4 py-2 sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-[1720px] mx-auto flex items-center justify-between gap-3">
-          {/* Module Selector Dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsDropdownOpen((prev) => !prev)}
-              className="bg-[#0e1628] hover:bg-[#152038] text-white border border-[#24334f] hover:border-[#00f0ff] px-3.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,0,0,0.3)] select-none"
-            >
-              <div className="p-1 rounded bg-[#131d33] text-[#00f0ff]">
-                <ActiveIcon className="w-3.5 h-3.5" />
-              </div>
-              <div className="text-left flex items-center gap-2">
-                <span className="tracking-wide">{activeTabMeta.label}</span>
-                {activeTabMeta.badge && (
-                  <span className="text-[9px] bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/30 px-1.5 py-0.2 rounded font-mono font-normal">
-                    {activeTabMeta.badge}
-                  </span>
-                )}
-              </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-[#94a3b8] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[#00f0ff]' : ''}`} />
-            </button>
+          {/* Left: View Mode Toggle (Executive vs IT Pro) & Module Selector */}
+          <div className="flex items-center gap-3">
+            {/* View Mode Switcher */}
+            <div className="flex items-center bg-[#070b14] border border-[#1e2d45] rounded-md p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setPerspectiveMode('executive')}
+                className={`px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  perspectiveMode === 'executive'
+                    ? 'bg-[#00f0ff] text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]'
+                    : 'text-[#94a3b8] hover:text-white'
+                }`}
+              >
+                <span>👔 Direzione</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPerspectiveMode('it-pro')}
+                className={`px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  perspectiveMode === 'it-pro'
+                    ? 'bg-[#3b82f6] text-white shadow-[0_0_12px_rgba(59,130,246,0.4)]'
+                    : 'text-[#94a3b8] hover:text-white'
+                }`}
+              >
+                <span>💻 IT Pro / SOC</span>
+              </button>
+            </div>
+
+            {/* Module Selector Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
+                className="bg-[#0e1628] hover:bg-[#152038] text-white border border-[#24334f] hover:border-[#00f0ff] px-3.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,0,0,0.3)] select-none"
+              >
+                <div className="p-1 rounded bg-[#131d33] text-[#00f0ff]">
+                  <ActiveIcon className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-left flex items-center gap-2">
+                  <span className="tracking-wide">{activeTabMeta.label}</span>
+                  {activeTabMeta.badge && (
+                    <span className="text-[9px] bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/30 px-1.5 py-0.2 rounded font-mono font-normal">
+                      {activeTabMeta.badge}
+                    </span>
+                  )}
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-[#94a3b8] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[#00f0ff]' : ''}`} />
+              </button>
 
             {/* Dropdown Floating Popover */}
             {isDropdownOpen && (
@@ -297,10 +335,19 @@ export default function Dashboard() {
                 </div>
             )}
           </div>
+        </div>
 
-          {/* Right Indicator: Active Target */}
+          {/* Right Indicator: Active Target & Active Defense Button */}
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-[#64748b]">TARGET ATTIVO:</span>
+            <button
+              type="button"
+              onClick={() => setShowActiveDefenseModal(true)}
+              className="bg-[#450a0a] hover:bg-[#7f1d1d] text-[#fca5a5] border border-[#b91c1c] px-2.5 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-[#ef4444]" />
+              <span className="hidden sm:inline">Scudo Attivo & Alert</span>
+            </button>
+            <span className="text-[#64748b]">TARGET:</span>
             <span className="text-[#00f0ff] font-mono font-bold bg-[#0e1628] border border-[#1f2d45] px-2.5 py-1 rounded">
               {target}
             </span>
@@ -308,13 +355,20 @@ export default function Dashboard() {
         </div>
       </nav>
 
+      {/* Active Defense & Alerting Sentinel Modal */}
+      <ActiveDefenseModal
+        target={target}
+        isOpen={showActiveDefenseModal}
+        onClose={() => setShowActiveDefenseModal(false)}
+      />
+
       {/* Main Content Area */}
       <main className="max-w-[1720px] mx-auto p-4 space-y-4">
         {/* ========================================================================= */}
         {/* TAB 0: EXECUTIVE SUMMARY & REMEDIATION PLAN */}
         {/* ========================================================================= */}
         {activeSection === 'remediation' && (
-          <ExecutiveRemediationSummary target={target} />
+          <ExecutiveRemediationSummary target={target} perspectiveMode={perspectiveMode} />
         )}
 
         {/* ========================================================================= */}
@@ -585,12 +639,15 @@ _dmarc.${target}. IN TXT "v=DMARC1; p=reject; sp=reject; pct=100; rua=mailto:dma
         )}
       </main>
 
-      {/* Export Report Modal */}
+      {/* Export Master Report Modal (All Modules Included) */}
       <ExportReportModal
         isOpen={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
         target={target}
         results={results}
+        internalResults={internalSuite.results}
+        securityResults={securitySuite.results}
+        vulnerabilityResults={vulnerabilitySuite.results}
       />
     </div>
   );

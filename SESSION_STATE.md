@@ -28,10 +28,11 @@
 - [x] Unificazione completa della UI: rimossa la vecchia vista classica legacy e la route /hud ridondante
 - [x] Root page (`src/app/page.tsx`) consolidata come HUD definitivo unico con selettore moduli a tendina (dropdown), badge notifiche dinamico, zero duplicati e zero elementi superflui
 - [x] Executive Remediation Summary & Report PDF contestualizzato integrati direttamente nella vista principale
+- [x] Integrazione Knowledge Base Cybersecurity (`security-framework-catalog.ts`) con mappatura MITRE ATT&CK, MITRE D3FEND, NIST CSF 2.0 e CWE
+- [x] Switch Prospettiva Dual-View nella testata HUD: [ 👔 Direzione ] (vista business sintetica a semaforo) ↔ [ 💻 IT Pro / SOC ] (dettaglio tecnico completo)
+- [x] Integrazione badge MITRE D3FEND (D3-NTF, D3-AHA) nelle card interattive e matrice di conformità NIS2 nel PDF esportato
+- [x] Modulo Sentinel Active Defense (`ActiveDefenseModal.tsx` + `api/active-defense/route.ts`): Panic Mode WAF e dispatcher allarmi Telegram con test interattivo
 - [x] Typecheck e Sentinel Check verificati con successo (0 errori)
-
-- [x] Deploy di Produzione Live completato con successo su Vercel: **https://network-diagnostic-tool-sepia.vercel.app**
-- [x] Build ottimizzato con rimozione dipendenze e variabili non usate, verifica HTTP/2 200
 
 ### In corso (In Progress)
 - [ ] Monitoraggio e rifiniture su richiesta utente
