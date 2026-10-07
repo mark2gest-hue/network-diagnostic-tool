@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { TestResult, ExternalTestType } from '@/types/tests';
+import { TestResult, ExternalTestType, TestStatus } from '@/types/tests';
 
 export function useExternalTests() {
   const [results, setResults] = useState<Record<ExternalTestType, TestResult | null>>({
@@ -62,7 +62,17 @@ export function useExternalTests() {
       const data = await res.json();
 
       if (res.ok) {
-        updateResult(type, { status: data.status || 'pass', result: data });
+        let testStatus: TestStatus = 'pass';
+        if (typeof data.status === 'number') {
+          testStatus = data.status >= 200 && data.status < 400 ? 'pass' : 'fail';
+        } else if (typeof data.status === 'string') {
+          const s = data.status.toLowerCase();
+          if (['pass', 'success', 'passed', 'propagated', 'ok'].includes(s)) testStatus = 'pass';
+          else if (['warning', 'warn', 'attention'].includes(s)) testStatus = 'warning';
+          else if (['fail', 'failed', 'error'].includes(s)) testStatus = 'fail';
+          else testStatus = 'pass';
+        }
+        updateResult(type, { status: testStatus, result: data });
       } else {
         updateResult(type, { status: 'fail', error: data.error });
       }

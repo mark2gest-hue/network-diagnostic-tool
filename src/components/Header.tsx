@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Activity, LogOut, LogIn, Bell } from 'lucide-react';
+import { LogOut, LogIn, Bell } from 'lucide-react';
 import { User } from '@/types/tests';
 import { HistoryDrawer } from './HistoryDrawer';
 import { NotificationCenterModal } from './dashboard/NotificationCenterModal';
@@ -12,13 +12,38 @@ import { NotificationCenterModal } from './dashboard/NotificationCenterModal';
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
   const router = useRouter();
+
+  const updateAlertsCount = () => {
+    try {
+      const saved = localStorage.getItem('networkdiag_alerts_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setUnreadAlerts(parsed.filter((a: { read?: boolean }) => !a.read).length);
+          return;
+        }
+      }
+      setUnreadAlerts(0);
+    } catch {
+      setUnreadAlerts(0);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then(({ user }) => setUser(user))
       .catch(() => setUser(null));
+
+    updateAlertsCount();
+    window.addEventListener('storage', updateAlertsCount);
+    const interval = setInterval(updateAlertsCount, 3000);
+    return () => {
+      window.removeEventListener('storage', updateAlertsCount);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -30,31 +55,47 @@ export default function Header() {
   return (
     <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-50 transition-all">
       <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2.5 font-black text-xl text-white tracking-tight group">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-            <Activity className="w-5 h-5" />
+        {/* Brand Logo & Aiutiamoci Impresa Badge */}
+        <Link href="/" className="flex items-center gap-3 font-black text-xl text-white tracking-tight group">
+          <div className="relative flex items-center justify-center p-1 rounded-xl bg-slate-900 border border-slate-800 shadow-md group-hover:scale-105 transition-transform">
+            <img
+              src="/images/logo_icon_dark.png"
+              alt="Aiutiamoci Impresa"
+              className="h-8 w-8 object-contain shrink-0"
+            />
           </div>
-          <span className="flex items-center">
-            Network<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Diag</span>
-          </span>
-          <span className="hidden sm:inline-block ml-2 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            Ops Pro
-          </span>
+          <div className="flex flex-col text-left">
+            <div className="flex items-center gap-1.5 leading-none">
+              <span className="font-black text-lg tracking-tight text-white flex items-center">
+                Network<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Diag</span>
+              </span>
+              <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                Ops Pro
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold text-slate-400 tracking-wide mt-1 flex items-center gap-1">
+              by <span className="text-slate-200 font-bold">aiutiamoci</span> <span className="text-[8.5px] font-bold uppercase text-blue-400 bg-blue-500/15 border border-blue-500/25 px-1 py-0.2 rounded">Impresa</span>
+            </span>
+          </div>
         </Link>
 
         {/* Live Status indicator & Navigation */}
         <nav className="flex items-center gap-2 sm:gap-3">
           {/* Notification Center Trigger */}
           <button
-            onClick={() => setNotificationsOpen(true)}
-            className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white transition-all"
+            onClick={() => {
+              setNotificationsOpen(true);
+              setTimeout(updateAlertsCount, 300);
+            }}
+            className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white transition-all cursor-pointer"
             title="Centro Notifiche & Alert di Sicurezza"
           >
             <Bell className="w-4 h-4 text-violet-400" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white shadow-md">
-              3
-            </span>
+            {unreadAlerts > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white shadow-md animate-pulse">
+                {unreadAlerts}
+              </span>
+            )}
           </button>
 
           <HistoryDrawer />

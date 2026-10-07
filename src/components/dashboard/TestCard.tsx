@@ -57,7 +57,7 @@ export function TestCard({ test, loading, onRun, title, description, icon: Custo
     normalizedStatus = 'running';
   } else if (test?.status) {
     const s = String(test.status).toLowerCase();
-    if (['pass', 'success', 'passed', 'propagated', 'ok'].includes(s)) normalizedStatus = 'pass';
+    if (['pass', 'success', 'passed', 'propagated', 'ok', '200'].includes(s) || Number(test.status) === 200) normalizedStatus = 'pass';
     else if (['warning', 'warn', 'attention'].includes(s)) normalizedStatus = 'warning';
     else if (['fail', 'failed', 'error'].includes(s)) normalizedStatus = 'fail';
     else if (['running', 'loading'].includes(s)) normalizedStatus = 'running';

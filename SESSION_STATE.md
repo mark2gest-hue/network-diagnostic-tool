@@ -22,13 +22,22 @@
 - [x] Auto-sanitizzazione intelligente degli URL (rimozione automatica di https://, percorsi e porte)
 - [x] Eliminati i raw dump JSON di Zod in favore di messaggi chiari in italiano
 - [x] Porta dev locale configurata stabilmente su :3004 con isolamento da Live Preview (porta 4050)
+- [x] Integrato logo e branding **Aiutiamoci Impresa** in alto a sinistra nella Navbar ([Header.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/Header.tsx))
+- [x] Generata Scheda Tecnica & Pitch Funzionale in PDF di 2 pagine ([NetworkDiag_Ops_Pro_Presentazione_Funzionale.pdf](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/NetworkDiag_Ops_Pro_Presentazione_Funzionale.pdf)) con sezione dedicata alla veridicità dei test ed embed automatico nel Secondo Cervello Obsidian
+
+- [x] Unificazione completa della UI: rimossa la vecchia vista classica legacy e la route /hud ridondante
+- [x] Root page (`src/app/page.tsx`) consolidata come HUD definitivo unico con selettore moduli a tendina (dropdown), badge notifiche dinamico, zero duplicati e zero elementi superflui
+- [x] Executive Remediation Summary & Report PDF contestualizzato integrati direttamente nella vista principale
+- [x] Typecheck e Sentinel Check verificati con successo (0 errori)
+
+- [x] Deploy di Produzione Live completato con successo su Vercel: **https://network-diagnostic-tool-sepia.vercel.app**
+- [x] Build ottimizzato con rimozione dipendenze e variabili non usate, verifica HTTP/2 200
 
 ### In corso (In Progress)
 - [ ] Monitoraggio e rifiniture su richiesta utente
 
 ### Da fare (Todo)
-- [ ] Verifica e validazione typecheck/lint su richiesta esplicita
-- [ ] Eventuale estensione generazione PDF anche per moduli Security Audit e Vulnerabilità
+- [ ] Eventuale associazione dominio o sottodominio personalizzato (es. `diag.aiutiamoci.cloud` o `network.mark2.cloud`)
 
 ---
 
