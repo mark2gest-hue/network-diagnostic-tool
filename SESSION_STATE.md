@@ -32,6 +32,10 @@
 - [x] Switch Prospettiva Dual-View nella testata HUD: [ 👔 Direzione ] (vista business sintetica a semaforo) ↔ [ 💻 IT Pro / SOC ] (dettaglio tecnico completo)
 - [x] Integrazione badge MITRE D3FEND (D3-NTF, D3-AHA) nelle card interattive e matrice di conformità NIS2 nel PDF esportato
 - [x] Modulo Sentinel Active Defense (`ActiveDefenseModal.tsx` + `api/active-defense/route.ts`): Panic Mode WAF e dispatcher allarmi Telegram con test interattivo
+- [x] Skill Globale Cybersecurity Playbooks (`cyber-defense-playbooks`): Standard agentskills.io, MITRE ATLAS e passive CT logging
+- [x] Subdomain Hunter & Surface Recon: Route passiva Next.js (`/api/tests/subdomains`) con CT crt.sh e rilevamento CNAME Subdomain Takeover orfani
+- [x] Componente HUD SubdomainHunterCard (`SubdomainHunterCard.tsx`) integrato in pagina principale con supporto Dual-View (Direzione vs IT Pro)
+- [x] Modulo "Email Armor & AXFR" (MTA-STS RFC 8461, BIMI e DNS Zone Transfer AXFR passivo con MITRE D3-MHA e D3-DNSA): endpoint `/api/security/email-armor/route.ts`, hook `useSecurityAudit.ts`, rendering in `ResultRenderer.tsx` e card `SecurityAudit.tsx`
 - [x] Typecheck e Sentinel Check verificati con successo (0 errori)
 
 ### In corso (In Progress)
@@ -46,8 +50,10 @@
 
 | File | Operazione | Impatto |
 | :--- | :--- | :--- |
-| [ExportReportModal.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ExportReportModal.tsx) | Creazione | Modal interattivo per anagrafica cliente e download PDF professionale con `jspdf-autotable` |
-| [ExternalTests.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ExternalTests.tsx) | Modifica | Aggiunto pulsante "Report PDF" abilitato a fine test e aggancio al modal |
+| [route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/security/email-armor/route.ts) | Creazione | Endpoint audit passivo MTA-STS, BIMI e DNS AXFR con mapping MITRE D3FEND |
+| [useSecurityAudit.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/hooks/useSecurityAudit.ts) | Modifica | Aggiunto test `emailArmor` (punteggio ponderato 0-100) e sequenza di scansione |
+| [ResultRenderer.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ResultRenderer.tsx) | Modifica | Visualizzazione dettagliata MTA-STS, BIMI e AXFR con badge di sicurezza |
+| [SecurityAudit.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/SecurityAudit.tsx) | Modifica | Card interattiva e barra progresso aggiornata a 11 verifiche |
 | [SESSION_STATE.md](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/SESSION_STATE.md) | Aggiornamento | Tracciamento avanzamento e stato del progetto |
 
 ---

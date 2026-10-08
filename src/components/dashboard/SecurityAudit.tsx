@@ -34,7 +34,7 @@ export function SecurityAudit() {
   
   const isRunning = Object.values(loading).some(l => l);
   const completedCount = Object.values(results).filter(r => r !== null && r.status !== 'idle' && r.status !== 'running').length;
-  const progress = (completedCount / 10) * 100;
+  const progress = (completedCount / 11) * 100;
 
   const getScoreMeta = (score: number) => {
     if (score >= 80) return {
@@ -129,7 +129,7 @@ export function SecurityAudit() {
           <div className="flex justify-between text-xs text-purple-400 font-bold uppercase tracking-widest">
             <span className="flex items-center gap-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Scansione di sicurezza in corso ({completedCount}/10 verifiche completate)...
+              Scansione di sicurezza in corso ({completedCount}/11 verifiche completate)...
             </span>
             <span>{Math.round(progress)}%</span>
           </div>
@@ -209,6 +209,14 @@ export function SecurityAudit() {
           title="DNSSEC Zone Validation" 
           description="Verifica firma e integrità crittografica della zona DNS"
           icon={Shield}
+        />
+        <TestCard 
+          test={results.emailArmor} 
+          loading={loading.emailArmor} 
+          onRun={() => runAll(target)} 
+          title="Email Armor & AXFR" 
+          description="MTA-STS (RFC 8461), BIMI e protezione DNS Zone Transfer (AXFR)"
+          icon={ShieldCheck}
         />
         <TestCard 
           test={results.headers} 

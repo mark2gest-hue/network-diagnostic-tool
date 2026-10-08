@@ -17,6 +17,7 @@ export function useSecurityAudit() {
     subdomains: null,
     blacklist: null,
     ports: null,
+    emailArmor: null,
   });
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [overallScore, setOverallScore] = useState<number | null>(null);
@@ -71,6 +72,7 @@ export function useSecurityAudit() {
       { id: 'dkim', endpoint: 'dkim' },
       { id: 'dmarc', endpoint: 'dmarc' },
       { id: 'dnssec', endpoint: 'dnssec' },
+      { id: 'emailArmor', endpoint: 'email-armor' },
       { id: 'headers', endpoint: 'headers' },
       { id: 'tls', endpoint: 'tls' },
       { id: 'admin', endpoint: 'admin' },

@@ -13,6 +13,7 @@ import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
 import { ManualSection } from '@/components/dashboard/ManualSection';
 import { ExecutiveRemediationSummary } from '@/components/dashboard/ExecutiveRemediationSummary';
 import { ActiveDefenseModal } from '@/components/dashboard/ActiveDefenseModal';
+import { SubdomainHunterCard } from '@/components/dashboard/SubdomainHunterCard';
 import {
   Globe,
   ShieldCheck,
@@ -599,6 +600,9 @@ _dmarc.${target}. IN TXT "v=DMARC1; p=reject; sp=reject; pct=100; rua=mailto:dma
                 </div>
               </div>
             )}
+
+            {/* Passive Subdomain Recon & Attack Surface */}
+            <SubdomainHunterCard target={target} perspectiveMode={perspectiveMode} />
           </div>
         )}
 

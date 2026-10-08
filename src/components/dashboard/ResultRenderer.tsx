@@ -370,6 +370,70 @@ export function ResultRenderer({ result }: ResultRendererProps) {
       );
     }
 
+    // 7.1 Vulnerability: Frontend Secret Leaks
+    if ('detectedSecrets' in data && Array.isArray(data.detectedSecrets)) {
+      const secrets = data.detectedSecrets as Array<{
+        name: string;
+        category: string;
+        severity: 'critical' | 'high' | 'medium';
+        sourceFile: string;
+        matchedMasked: string;
+        description: string;
+      }>;
+      return (
+        <div className="space-y-2.5 text-xs">
+          {secrets.length === 0 ? (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs leading-snug">Nessun token o chiave API segreta rilevata nei bundle JS.</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <span className="text-[10px] text-red-400 uppercase font-bold tracking-wider block">
+                Segreti Rilevati ({secrets.length}):
+              </span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {secrets.map((sec, i) => (
+                  <div key={i} className="p-2 rounded-lg bg-red-950/20 border border-red-500/30 font-mono text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-red-300 truncate">{sec.name}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[8px] bg-red-950/60 text-red-300 border border-red-500/40 px-1 py-0.2 rounded font-mono font-bold">
+                          T1552.001
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'text-[9px] uppercase whitespace-nowrap',
+                            sec.severity === 'critical'
+                              ? 'bg-red-500/30 text-red-200 border-red-500'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          )}
+                        >
+                          {sec.severity}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>Origine: {sec.sourceFile}</span>
+                      <span className="text-zinc-200 bg-zinc-900 px-1.5 py-0.2 rounded border border-zinc-800">
+                        {sec.matchedMasked}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     // 8. Vulnerability: Cookie Security Flags
     if ('cookies' in data && Array.isArray(data.cookies)) {
       const cookies = data.cookies as CookieItem[];
@@ -407,6 +471,126 @@ export function ResultRenderer({ result }: ResultRendererProps) {
               ))}
             </div>
           )}
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 8.1 Email Armor & AXFR (MTA-STS / BIMI / Zone Transfer)
+    if ('mtaSts' in data && 'axfr' in data) {
+      const mtaSts = (data.mtaSts as {
+        enabled?: boolean;
+        mode?: string;
+        record?: string;
+        policyValid?: boolean;
+      }) || {};
+      const bimi = (data.bimi as {
+        enabled?: boolean;
+        record?: string;
+        logoUrl?: string;
+        vmcUrl?: string;
+        hasVmc?: boolean;
+      }) || {};
+      const axfr = (data.axfr as {
+        protected?: boolean;
+        testedNs?: string;
+        message?: string;
+      }) || {};
+      const score = typeof data.score === 'number' ? data.score : 0;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {/* Header Bar */}
+          <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-zinc-500 uppercase font-semibold block tracking-wide">Punteggio Armor</span>
+              <span className="font-bold font-mono text-zinc-200 text-sm leading-none mt-0.5 block">{score} / 100</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[8px] bg-purple-950/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono font-bold" title="MITRE D3FEND: D3-MHA (Mail Server Hardening)">
+                D3-MHA
+              </span>
+              <span className="text-[8px] bg-blue-950/60 text-blue-300 border border-blue-500/40 px-1.5 py-0.5 rounded font-mono font-bold" title="MITRE D3FEND: D3-DNSA (DNS Access Control)">
+                D3-DNSA
+              </span>
+            </div>
+          </div>
+
+          {/* 3 Controlli: MTA-STS, BIMI, AXFR */}
+          <div className="space-y-1.5">
+            {/* MTA-STS */}
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
+              <div className="flex items-center justify-between gap-2 font-mono text-xs">
+                <span className="font-bold text-zinc-200 truncate">MTA-STS (RFC 8461)</span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[9px] shrink-0 whitespace-nowrap',
+                    mtaSts.mode === 'enforce'
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                      : mtaSts.mode === 'testing'
+                      ? 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                  )}
+                >
+                  {mtaSts.mode === 'enforce' ? 'Enforce (Attivo)' : mtaSts.mode === 'testing' ? 'Testing Mode' : 'Non Configurato'}
+                </Badge>
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate font-mono">
+                {mtaSts.record ? `Record: ${mtaSts.record}` : 'Nessun record _mta-sts trovato'}
+                {mtaSts.policyValid ? ' • Policy HTTPS: OK' : ''}
+              </div>
+            </div>
+
+            {/* BIMI */}
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
+              <div className="flex items-center justify-between gap-2 font-mono text-xs">
+                <span className="font-bold text-zinc-200 truncate">BIMI Brand Auth</span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[9px] shrink-0 whitespace-nowrap',
+                    bimi.hasVmc
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                      : bimi.enabled
+                      ? 'bg-blue-950/40 text-blue-300 border-blue-500/40'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                  )}
+                >
+                  {bimi.hasVmc ? 'VMC Certificato' : bimi.enabled ? 'Logo Assertito' : 'Non Presente'}
+                </Badge>
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate font-mono">
+                {bimi.logoUrl ? `Logo: ${bimi.logoUrl}` : 'Nessun record default._bimi trovato'}
+              </div>
+            </div>
+
+            {/* DNS Zone Transfer AXFR */}
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
+              <div className="flex items-center justify-between gap-2 font-mono text-xs">
+                <span className="font-bold text-zinc-200 truncate">AXFR Zone Transfer</span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[9px] shrink-0 whitespace-nowrap font-mono',
+                    axfr.protected
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                      : 'bg-red-950/40 text-red-300 border-red-500/40'
+                  )}
+                >
+                  {axfr.protected ? 'Protetto' : 'AXFR Aperto (Critico)'}
+                </Badge>
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate font-mono">
+                {axfr.testedNs ? `Server: ${axfr.testedNs} • ${axfr.message || ''}` : axfr.message || ''}
+              </div>
+            </div>
+          </div>
+
           {Boolean(data.recommendation) && (
             <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
               {String(data.recommendation)}
