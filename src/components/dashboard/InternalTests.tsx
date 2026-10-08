@@ -19,12 +19,13 @@ export function InternalTests() {
     runLatency, 
     runWifi, 
     runPacketLoss, 
+    runNetworkIntegrity,
     runAll 
   } = useInternalTests();
 
   const activeCount = Object.values(loading).filter(Boolean).length;
   const finishedCount = Object.values(results).filter(r => r !== null && r.status !== 'running').length;
-  const totalTests = 6;
+  const totalTests = 7;
   const progress = (finishedCount / totalTests) * 100;
 
   return (
@@ -46,7 +47,7 @@ export function InternalTests() {
         <div className="flex items-center gap-3">
           <ExportButton externalResults={{}} internalResults={results} />
           <Button 
-            onClick={runAll} 
+            onClick={() => runAll()} 
             disabled={activeCount > 0}
             className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold px-5 py-5 rounded-xl shadow-lg shadow-emerald-600/25 border border-emerald-400/20 transition-all min-w-[140px]"
           >
@@ -126,6 +127,14 @@ export function InternalTests() {
           test={results.packet_loss}
           loading={loading.packet_loss}
           onRun={runPacketLoss}
+        />
+        <TestCard 
+          title="Integrità DNS & Path MTU"
+          description="Verifica assenza di DNS Hijacking / Poisoning e stima MTU 1500 / MSS 1460"
+          icon={Network}
+          test={results.network_integrity}
+          loading={loading.network_integrity}
+          onRun={() => runNetworkIntegrity()}
         />
       </div>
 

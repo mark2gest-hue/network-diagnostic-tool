@@ -4,12 +4,26 @@ import { validateSafeTarget } from '@/lib/validators';
 export const dynamic = 'force-dynamic';
 
 const SENSITIVE_FILES = [
-  { path: '/.env', label: 'Ambiente (.env)', risk: 'critical' },
+  { path: '/.env', label: 'Ambiente Principale (.env)', risk: 'critical' },
+  { path: '/.env.local', label: 'Ambiente Locale (.env.local)', risk: 'critical' },
+  { path: '/.env.production', label: 'Ambiente Produzione (.env.production)', risk: 'critical' },
   { path: '/.git/HEAD', label: 'Repository Git (.git/HEAD)', risk: 'critical' },
+  { path: '/.git/config', label: 'Configurazione Git (.git/config)', risk: 'critical' },
+  { path: '/docker-compose.yml', label: 'Orchestrazione Docker (docker-compose.yml)', risk: 'critical' },
+  { path: '/Dockerfile', label: 'Specifica Build Dockerfile', risk: 'high' },
+  { path: '/.aws/credentials', label: 'Credenziali Cloud AWS (.aws/credentials)', risk: 'critical' },
+  { path: '/.vscode/sftp.json', label: 'Credenziali SFTP VSCode', risk: 'critical' },
+  { path: '/id_rsa', label: 'Chiave Privata SSH (id_rsa)', risk: 'critical' },
   { path: '/backup.sql', label: 'Database Backup (backup.sql)', risk: 'high' },
   { path: '/dump.sql', label: 'Database Dump (dump.sql)', risk: 'high' },
+  { path: '/database.sql', label: 'Database SQL (database.sql)', risk: 'high' },
   { path: '/wp-config.php.bak', label: 'WordPress Backup (wp-config.php.bak)', risk: 'high' },
+  { path: '/wp-config.php~', label: 'WordPress Editor Backup (wp-config.php~)', risk: 'high' },
+  { path: '/xmlrpc.php', label: 'WordPress XML-RPC (Rischio Brute-force/DDoS)', risk: 'medium' },
+  { path: '/wp-json/wp/v2/users', label: 'WordPress User Enumeration REST API', risk: 'medium' },
+  { path: '/phpinfo.php', label: 'PHP Info Telemetria (phpinfo.php)', risk: 'high' },
   { path: '/server-status', label: 'Apache Server Status', risk: 'medium' },
+  { path: '/web.config', label: 'Configurazione IIS (web.config)', risk: 'high' },
   { path: '/.well-known/security.txt', label: 'Security Policy (security.txt)', risk: 'info' },
   { path: '/robots.txt', label: 'Robots File (robots.txt)', risk: 'info' }
 ];
@@ -46,15 +60,40 @@ export async function GET(req: Request) {
           // Consideriamo esposto solo se 200 OK e non una pagina HTML di errore generico (SPA catch-all)
           if (res.status === 200) {
             const isHtml = contentType.includes('text/html');
-            if (file.path === '/.git/HEAD') {
+            if (file.path.startsWith('/.git/')) {
               const text = await res.text();
-              if (text.includes('ref:')) {
-                return { ...file, status: 'exposed', detail: 'Trovato puntatore ref di Git!' };
+              if (text.includes('ref:') || text.includes('[core]') || text.includes('[remote')) {
+                return { ...file, status: 'exposed', detail: 'Trovato puntatore o configurazione Git!' };
               }
-            } else if (file.path === '/.env') {
+            } else if (file.path.startsWith('/.env')) {
               const text = await res.text();
               if (text.includes('=') && !isHtml) {
                 return { ...file, status: 'exposed', detail: 'Esposizione variabili d\'ambiente' };
+              }
+            } else if (file.path.endsWith('.sql')) {
+              const text = await res.text();
+              if (!isHtml && (text.includes('CREATE TABLE') || text.includes('INSERT INTO') || text.includes('DROP TABLE') || text.includes('MySQL dump'))) {
+                return { ...file, status: 'exposed', detail: 'Rilevato dump SQL di database scaricabile!' };
+              }
+            } else if (file.path === '/id_rsa') {
+              const text = await res.text();
+              if (text.includes('BEGIN RSA PRIVATE KEY') || text.includes('BEGIN OPENSSH PRIVATE KEY')) {
+                return { ...file, status: 'exposed', detail: 'Chiave privata SSH non protetta!' };
+              }
+            } else if (file.path === '/docker-compose.yml' || file.path === '/Dockerfile') {
+              const text = await res.text();
+              if (!isHtml && (text.includes('version:') || text.includes('services:') || text.includes('FROM '))) {
+                return { ...file, status: 'exposed', detail: 'File di infrastruttura Docker accessibile' };
+              }
+            } else if (file.path === '/wp-json/wp/v2/users') {
+              const text = await res.text();
+              if (contentType.includes('application/json') && text.includes('"slug":')) {
+                return { ...file, status: 'exposed', detail: 'Esposizione nomi utente WordPress (User Enumeration)' };
+              }
+            } else if (file.path === '/phpinfo.php') {
+              const text = await res.text();
+              if (text.includes('PHP Version') && text.includes('Configuration')) {
+                return { ...file, status: 'exposed', detail: 'Telemetria PHP Info completa esposta' };
               }
             } else if (!isHtml || file.path.endsWith('.txt')) {
               return { ...file, status: 'exposed', detail: `File raggiungibile (HTTP 200)` };

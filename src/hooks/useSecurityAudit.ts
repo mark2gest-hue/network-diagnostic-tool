@@ -18,6 +18,7 @@ export function useSecurityAudit() {
     blacklist: null,
     ports: null,
     emailArmor: null,
+    leaks: null,
   });
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [overallScore, setOverallScore] = useState<number | null>(null);
@@ -79,6 +80,7 @@ export function useSecurityAudit() {
       { id: 'subdomains', endpoint: 'subdomains' },
       { id: 'blacklist', endpoint: 'blacklist' },
       { id: 'ports', endpoint: 'ports' },
+      { id: 'leaks', endpoint: 'leaks' },
     ];
 
     for (const test of tests) {

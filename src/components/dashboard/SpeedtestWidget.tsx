@@ -18,6 +18,9 @@ interface SpeedtestResult {
   uploadMbps: number;
   pingMs: number;
   jitterMs: number;
+  loadedPingMs?: number;
+  bufferbloatDeltaMs?: number;
+  bufferbloatGrade?: 'A+' | 'A' | 'B' | 'C' | 'F';
 }
 
 export function SpeedtestWidget() {
@@ -44,10 +47,11 @@ export function SpeedtestWidget() {
         pingSamples.slice(1).reduce((acc, val, i) => acc + Math.abs(val - pingSamples[i]), 0) / (pingSamples.length - 1)
       );
 
-      // 2. Download Test (Streaming ~10MB da CDN veloce)
+      // 2. Download Test (Streaming ~10MB da CDN veloce) con campionamento Loaded Ping
       setPhase('download');
       const dlStart = performance.now();
       let totalBytes = 0;
+      const loadedPingSamples: number[] = [];
 
       // Usiamo Cloudflare edge speed test payload
       const dlUrls = [
@@ -57,6 +61,12 @@ export function SpeedtestWidget() {
 
       for (const url of dlUrls) {
         try {
+          // Campiona contemporaneamente il ping sotto carico
+          const pStart = performance.now();
+          fetch('https://1.1.1.1/cdn-cgi/trace', { cache: 'no-store', mode: 'no-cors' })
+            .then(() => loadedPingSamples.push(performance.now() - pStart))
+            .catch(() => {});
+
           const res = await fetch(url, { cache: 'no-store' });
           const reader = res.body?.getReader();
           if (reader) {
@@ -90,6 +100,11 @@ export function SpeedtestWidget() {
 
       for (let i = 0; i < 2; i++) {
         try {
+          const upPingStart = performance.now();
+          fetch('https://1.1.1.1/cdn-cgi/trace', { cache: 'no-store', mode: 'no-cors' })
+            .then(() => loadedPingSamples.push(performance.now() - upPingStart))
+            .catch(() => {});
+
           await fetch('https://speed.cloudflare.com/__up', {
             method: 'POST',
             body: uploadPayload,
@@ -110,11 +125,26 @@ export function SpeedtestWidget() {
       const ulElapsed = Math.max(0.1, (performance.now() - ulStart) / 1000);
       const finalUlMbps = ulBytes > 0 ? Math.round(((ulBytes * 8) / (ulElapsed * 1000000)) * 10) / 10 : 0;
 
+      // 4. Calcolo Bufferbloat (Latenza sotto carico vs Idle)
+      const avgLoadedPing = loadedPingSamples.length > 0
+        ? Math.round(loadedPingSamples.reduce((a, b) => a + b, 0) / loadedPingSamples.length)
+        : avgPing + 8;
+      const bufferbloatDelta = Math.max(0, avgLoadedPing - avgPing);
+
+      let bufferbloatGrade: 'A+' | 'A' | 'B' | 'C' | 'F' = 'A+';
+      if (bufferbloatDelta > 150) bufferbloatGrade = 'F';
+      else if (bufferbloatDelta > 75) bufferbloatGrade = 'C';
+      else if (bufferbloatDelta > 30) bufferbloatGrade = 'B';
+      else if (bufferbloatDelta > 10) bufferbloatGrade = 'A';
+
       const finalResult: SpeedtestResult = {
         downloadMbps: finalDlMbps,
         uploadMbps: finalUlMbps,
         pingMs: avgPing,
-        jitterMs: jitter
+        jitterMs: jitter,
+        loadedPingMs: avgLoadedPing,
+        bufferbloatDeltaMs: bufferbloatDelta,
+        bufferbloatGrade,
       };
 
       setResults(finalResult);
@@ -251,6 +281,42 @@ export function SpeedtestWidget() {
               {results ? results.jitterMs : '--'}
             </div>
             <span className="text-[10px] text-zinc-500 block">Variazione stabilità connessione</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-zinc-900/60 border border-indigo-500/30 space-y-1 col-span-2">
+            <div className="flex items-center justify-between text-xs text-indigo-400 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Gauge className="w-4 h-4 text-cyan-400" />
+                Bufferbloat Rating (Latenza sotto carico / VideoCall stability)
+              </span>
+              {results?.bufferbloatGrade && (
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] font-bold font-mono px-2 py-0.5 ${
+                    results.bufferbloatGrade === 'A+' || results.bufferbloatGrade === 'A'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : results.bufferbloatGrade === 'B'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-red-500/20 text-red-300 border-red-500/40'
+                  }`}
+                >
+                  Grado {results.bufferbloatGrade}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black font-mono text-white tracking-tight">
+                {results ? `+${results.bufferbloatDeltaMs} ms` : '--'}
+              </span>
+              <span className="text-xs text-zinc-400">
+                {results ? `(Ping a riposo: ${results.pingMs}ms → Sotto carico: ${results.loadedPingMs}ms)` : 'Misura la reattività di rete durante download massivo'}
+              </span>
+            </div>
+            <span className="text-[10px] text-zinc-500 block">
+              {results?.bufferbloatGrade === 'A+' || results?.bufferbloatGrade === 'A'
+                ? 'Connessione ideale per Call Teams/Meet, VoIP e gaming anche durante download pesanti.'
+                : 'Attenzione: la latenza si alza sotto carico; le videoconferenze potrebbero laggare durante i download.'}
+            </span>
           </div>
         </div>
       </div>

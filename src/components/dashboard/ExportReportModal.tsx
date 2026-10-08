@@ -237,10 +237,23 @@ export function ExportReportModal({
     const secRows: string[][] = Object.entries(safeSec).length > 0
       ? Object.entries(safeSec).map(([k, v]) => {
           const s = v?.status === 'pass' ? 'CONFORME' : v?.status === 'warning' ? 'ATTENZIONE' : v?.status === 'fail' ? 'CRITICO' : 'VERIFICATO';
-          const det = v?.result && typeof v.result === 'object' && 'detail' in (v.result as Record<string, unknown>)
-            ? String((v.result as Record<string, unknown>).detail).slice(0, 80)
-            : 'Record verificato';
-          return [k.toUpperCase(), s, det];
+          let det = 'Record verificato';
+          if (k === 'leaks') {
+            const comb = v?.result?.combCount || 0;
+            const breaches = v?.result?.breachesCount || 0;
+            det = `${comb} credenziali COMB esposte, ${breaches} data breach storici rilevati`;
+          } else if (k === 'emailArmor') {
+            const sts = v?.result?.mtaSts?.present ? 'MTA-STS: Presente' : 'MTA-STS: Assente';
+            const bimi = v?.result?.bimi?.present ? 'BIMI: Presente' : 'BIMI: Assente';
+            det = `${sts} | ${bimi}`;
+          } else if (v?.result && typeof v.result === 'object') {
+            if ('detail' in (v.result as Record<string, unknown>)) {
+              det = String((v.result as Record<string, unknown>).detail).slice(0, 90);
+            } else if ('summary' in (v.result as Record<string, unknown>)) {
+              det = String((v.result as Record<string, unknown>).summary).slice(0, 90);
+            }
+          }
+          return [k.replace(/([A-Z])/g, ' $1').toUpperCase(), s, det];
         })
       : [
           ['SPF RECORD', 'CONFORME', 'Record autoritativo attivo con validazione mittenti'],
@@ -277,7 +290,21 @@ export function ExportReportModal({
     const vulnRows: string[][] = Object.entries(safeVuln).length > 0
       ? Object.entries(safeVuln).map(([k, v]) => {
           const s = v?.status === 'pass' ? 'PROTETTO' : v?.status === 'fail' ? 'RISCHIO' : 'ATTENZIONE';
-          return [k.toUpperCase(), s, 'Scansione endpoint eseguita con successo'];
+          let det = 'Scansione endpoint eseguita con successo';
+          if (k === 'files') {
+            const exp = v?.result?.exposedFiles?.length || 0;
+            det = exp > 0 ? `Rilevati ${exp} file sensibili esposti (.env, .git, backup)` : 'Nessun file di ambiente o backup esposto';
+          } else if (k === 'secrets') {
+            const sec = v?.result?.detectedSecrets?.length || 0;
+            det = sec > 0 ? `Trovati ${sec} token o segreti hardcodati nei file JS` : 'Nessuna API key o token rilevato nel bundle';
+          } else if (v?.result && typeof v.result === 'object') {
+            if ('message' in (v.result as Record<string, unknown>)) {
+              det = String((v.result as Record<string, unknown>).message).slice(0, 90);
+            } else if ('summary' in (v.result as Record<string, unknown>)) {
+              det = String((v.result as Record<string, unknown>).summary).slice(0, 90);
+            }
+          }
+          return [k.toUpperCase(), s, det];
         })
       : [
           ['FILE SENSIBILI (.ENV / .GIT)', 'PROTETTO', 'Nessun file critico esposto o scaricabile pubblicamente'],

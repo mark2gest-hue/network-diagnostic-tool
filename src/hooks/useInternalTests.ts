@@ -13,6 +13,7 @@ export function useInternalTests() {
     wifi: null,
     packet_loss: null,
     dns_leak: null,
+    network_integrity: null,
   });
 
   const [loading, setLoading] = useState<Record<InternalTestType, boolean>>({
@@ -24,6 +25,7 @@ export function useInternalTests() {
     wifi: false,
     packet_loss: false,
     dns_leak: false,
+    network_integrity: false,
   });
 
   const updateResult = (type: InternalTestType, result: Partial<TestResult>) => {
@@ -181,6 +183,28 @@ export function useInternalTests() {
     setLoading(prev => ({ ...prev, packet_loss: false }));
   };
 
+  const runNetworkIntegrity = async (target?: string) => {
+    setLoading(prev => ({ ...prev, network_integrity: true }));
+    updateResult('network_integrity', { status: 'running' });
+    try {
+      const qTarget = target ? encodeURIComponent(target) : 'google.com';
+      const res = await fetch(`/api/lan/network-integrity?target=${qTarget}`);
+      const data = await res.json();
+      if (res.ok) {
+        updateResult('network_integrity', {
+          status: data.dnsSecurity?.status || 'pass',
+          result: data,
+        });
+      } else {
+        updateResult('network_integrity', { status: 'fail', error: data.error || 'Test fallito' });
+      }
+    } catch {
+      updateResult('network_integrity', { status: 'fail', error: 'Errore di connessione' });
+    } finally {
+      setLoading(prev => ({ ...prev, network_integrity: false }));
+    }
+  };
+
   return {
     results,
     loading,
@@ -190,13 +214,15 @@ export function useInternalTests() {
     runLatency,
     runWifi,
     runPacketLoss,
-    runAll: async () => {
+    runNetworkIntegrity,
+    runAll: async (target?: string) => {
         await runPublicIp();
         await runLocalIp();
         await runDnsSpeed();
         await runLatency();
         await runWifi();
         await runPacketLoss();
+        await runNetworkIntegrity(target);
     }
   };
 }

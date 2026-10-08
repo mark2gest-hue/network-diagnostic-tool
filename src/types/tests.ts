@@ -32,7 +32,8 @@ export type InternalTestType =
   | 'speed' 
   | 'wifi' 
   | 'packet_loss' 
-  | 'dns_leak';
+  | 'dns_leak'
+  | 'network_integrity';
 
 export interface User {
   id: string;

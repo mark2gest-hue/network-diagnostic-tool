@@ -10,7 +10,9 @@ import {
   Layers, 
   FileCode, 
   CheckCircle2, 
-  Cookie
+  Cookie,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 
 interface ResultRendererProps {
@@ -434,6 +436,84 @@ export function ResultRenderer({ result }: ResultRendererProps) {
       );
     }
 
+    // 7.2 Security / Leaks: DeepWeb & Credential Leaks
+    if ('combCount' in data || ('breaches' in data && 'sampleLeaks' in data)) {
+      const combCount = Number(data.combCount || 0);
+      const breaches = Array.isArray(data.breaches) ? data.breaches as Array<{
+        title?: string;
+        breachDate?: string;
+        pwnCount?: number;
+        dataClasses?: string[];
+      }> : [];
+      const sampleLeaks = Array.isArray(data.sampleLeaks) ? data.sampleLeaks as Array<{
+        email: string;
+        passwordMasked: string;
+        source: string;
+      }> : [];
+
+      const hasIssues = combCount > 0 || breaches.length > 0;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {!hasIssues ? (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold block">Nessun Leak Rilevato nel Dark Web</span>
+                <span className="text-[10px] text-emerald-400/80 block">Nessuna credenziale @{String(data.domain || 'target')} esposta in archivi pubblici e COMB (3.2B records).</span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-red-950/30 border border-red-500/30 text-red-300">
+                <div>
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold block">Esposizione Archivi</span>
+                  <span className="font-bold text-xs font-mono">{combCount} Credenziali & {breaches.length} Breach Noti</span>
+                </div>
+                <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/50 text-[10px] uppercase font-bold">
+                  {combCount > 50 ? 'Rischio Critico' : 'Attenzione'}
+                </Badge>
+              </div>
+
+              {breaches.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider block">Breach Storici Verificati:</span>
+                  <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
+                    {breaches.map((b, i) => (
+                      <div key={i} className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800 text-[11px] flex justify-between items-center font-mono">
+                        <span className="font-bold text-zinc-200">{b.title} ({b.breachDate?.slice(0, 4) || 'N/A'})</span>
+                        <span className="text-[10px] text-zinc-400">{Number(b.pwnCount || 0).toLocaleString()} account</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sampleLeaks.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider block">Campione Account Compromessi (Anonimizzati PII):</span>
+                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1 font-mono text-[11px]">
+                    {sampleLeaks.map((leak, i) => (
+                      <div key={i} className="p-1.5 rounded bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-2">
+                        <span className="text-red-300 font-semibold truncate">{leak.email}</span>
+                        <span className="text-zinc-500 bg-zinc-900 px-1 rounded text-[10px] border border-zinc-800 shrink-0">{leak.passwordMasked}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              💡 {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     // 8. Vulnerability: Cookie Security Flags
     if ('cookies' in data && Array.isArray(data.cookies)) {
       const cookies = data.cookies as CookieItem[];
@@ -589,6 +669,212 @@ export function ResultRenderer({ result }: ResultRendererProps) {
                 {axfr.testedNs ? `Server: ${axfr.testedNs} • ${axfr.message || ''}` : axfr.message || ''}
               </div>
             </div>
+          </div>
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 8.2 WAF & Origin IP Bypass Scanner
+    if ('detectedShields' in data || 'originBypass' in data) {
+      const shields = Array.isArray(data.detectedShields)
+        ? (data.detectedShields as Array<{ name: string; vendor: string }>)
+        : [];
+      const hasProtection = Boolean(data.hasProtection);
+      const originBypass = (data.originBypass as {
+        leakDetected?: boolean;
+        leakedHost?: string;
+        leakedIp?: string;
+        details?: string;
+      }) || {};
+      const serverHeader = String(data.serverHeader || '');
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {/* Header Bar */}
+          <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-zinc-500 uppercase font-semibold block tracking-wide">Scudo Perimetrale</span>
+              <span className="font-bold text-zinc-200 text-xs truncate block">
+                {hasProtection ? shields.map(s => s.name).join(', ') : 'Nessun WAF/CDN'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[8px] bg-purple-950/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono font-bold" title="MITRE D3FEND: D3-WAF">
+                D3-WAF
+              </span>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] font-semibold whitespace-nowrap',
+                  hasProtection ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                )}
+              >
+                {hasProtection ? 'Protetto' : 'Esposto'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Origin IP Leak / Bypass Box */}
+          <div className={cn(
+            'p-2.5 rounded-xl border space-y-1.5',
+            originBypass.leakDetected
+              ? 'bg-red-950/25 border-red-500/40 text-red-300'
+              : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+          )}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-xs flex items-center gap-1.5">
+                {originBypass.leakDetected ? (
+                  <>
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                    <span>Origin IP Leak Rilevato!</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Origin IP Protetto</span>
+                  </>
+                )}
+              </span>
+              <span className="text-[8px] bg-zinc-900 border border-zinc-700 px-1 py-0.5 rounded font-mono text-zinc-300">
+                T1590.005
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-zinc-300">
+              {originBypass.details || 'Nessun bypass individuato.'}
+            </p>
+            {Boolean(originBypass.leakedIp) && (
+              <div className="font-mono text-[10px] bg-zinc-950/80 p-1.5 rounded border border-red-500/30 text-red-200">
+                Host: <span className="text-zinc-100">{originBypass.leakedHost}</span> → IP Origine: <span className="font-bold text-red-400">{originBypass.leakedIp}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Server Header */}
+          {serverHeader && (
+            <div className="text-[10px] text-zinc-500 font-mono truncate px-1">
+              Header Server: <span className="text-zinc-400">{serverHeader}</span>
+            </div>
+          )}
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 8.3 Deep TLS Cipher & Protocol Matrix
+    if ('weakCiphers' in data) {
+      const protocols = Array.isArray(data.results)
+        ? (data.results as Array<{ version: string; supported: boolean; status: string }>)
+        : [];
+      const weakCiphers = Array.isArray(data.weakCiphers)
+        ? (data.weakCiphers as Array<{ name: string; supported: boolean; status: string }>)
+        : [];
+      const score = typeof data.score === 'number' ? data.score : 0;
+      const hasCaa = Boolean(data.hasCaa);
+      const caaCount = Number(data.caaCount) || 0;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {/* Header Bar */}
+          <div className="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-zinc-500 uppercase font-semibold block tracking-wide">Punteggio Crittografico</span>
+              <span className="font-bold font-mono text-zinc-200 text-sm leading-none mt-0.5 block">{score} / 100</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[8px] bg-purple-950/60 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded font-mono font-bold" title="MITRE D3FEND: D3-EPSC">
+                D3-EPSC
+              </span>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] font-semibold whitespace-nowrap',
+                  score >= 80 ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                )}
+              >
+                {score >= 80 ? 'TLS Moderno' : 'Revisione Richiesta'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Matrice Protocolli TLS */}
+          <div className="space-y-1">
+            <span className="text-[10px] text-zinc-500 uppercase font-semibold block">Versioni Protocollo</span>
+            <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px]">
+              {protocols.map((p, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'p-1.5 rounded-lg border flex items-center justify-between',
+                    p.supported
+                      ? p.status === 'pass'
+                        ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300'
+                        : 'bg-red-950/30 border-red-500/40 text-red-300'
+                      : 'bg-zinc-950/50 border-zinc-800/80 text-zinc-500'
+                  )}
+                >
+                  <span className="font-bold text-[10px]">{p.version}</span>
+                  <span className="text-[9px] uppercase font-bold">
+                    {p.supported ? (p.status === 'pass' ? 'Attivo' : 'Attivo (Insicuro)') : 'Bloccato'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cifrari Deboli */}
+          <div className="space-y-1">
+            <span className="text-[10px] text-zinc-500 uppercase font-semibold block">Cifrari Legacy & Sweet32</span>
+            <div className="space-y-1 font-mono text-[11px]">
+              {weakCiphers.map((c, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'p-1.5 rounded-lg border flex items-center justify-between',
+                    c.supported
+                      ? 'bg-red-950/30 border-red-500/40 text-red-300'
+                      : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                  )}
+                >
+                  <span className="text-[10px] truncate">{c.name}</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[8px] font-bold shrink-0',
+                      c.supported
+                        ? 'bg-red-500/20 text-red-300 border-red-500/50'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    )}
+                  >
+                    {c.supported ? 'Vulnerabile' : 'Rifiutato'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Record CAA */}
+          <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/60 border border-zinc-800 text-[11px] font-mono">
+            <span className="text-zinc-400">DNS CAA (RFC 8659):</span>
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-[9px]',
+                hasCaa ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+              )}
+            >
+              {hasCaa ? `${caaCount} CA Autorizzate` : 'Non Configurato'}
+            </Badge>
           </div>
 
           {Boolean(data.recommendation) && (
@@ -871,6 +1157,343 @@ export function ResultRenderer({ result }: ResultRendererProps) {
               {responseTime} ms
             </Badge>
           </div>
+        </div>
+      );
+    }
+
+    // 15. Open Risky Ports & Admin Exposure
+    if ('openRiskyPorts' in data && Array.isArray(data.openRiskyPorts)) {
+      const ports = data.openRiskyPorts as Array<{
+        port: number;
+        name: string;
+        risk: string;
+        recommendation: string;
+      }>;
+      const hasRisks = ports.length > 0;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {!hasRisks ? (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs leading-snug">Tutte le porte critiche (22, 3306, 5432, 21, 3389) risultano chiuse o protette.</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider block">
+                Porte a Rischio Aperte ({ports.length}):
+              </span>
+              <div className="space-y-1.5">
+                {ports.map((p, i) => (
+                  <div key={i} className="p-2 rounded-lg bg-amber-950/20 border border-amber-500/30 font-mono text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
+                        <span className="font-bold text-zinc-200">Porta {p.port} ({p.name})</span>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        'text-[9px] uppercase font-bold',
+                        p.risk === 'critical' ? 'bg-red-500/20 text-red-300 border-red-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      )}>
+                        {p.risk}
+                      </Badge>
+                    </div>
+                    {p.recommendation && (
+                      <p className="text-[10px] text-zinc-400 font-sans leading-relaxed pt-0.5">
+                        {p.recommendation}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 16. Admin Panel Exposure
+    if ('exposedPaths' in data && Array.isArray(data.exposedPaths)) {
+      const paths = data.exposedPaths as Array<{ path: string; status: string }>;
+      const hasExposed = paths.length > 0;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {!hasExposed ? (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs leading-snug">Nessun pannello amministrativo (/admin, /wp-admin, /phpmyadmin) esposto pubblicamente.</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider">
+                  Percorsi Raggiungibili ({paths.length}):
+                </span>
+                <span className="text-[8px] bg-amber-950/60 text-amber-300 border border-amber-500/40 px-1 py-0.5 rounded font-mono font-bold">
+                  D3-URIF
+                </span>
+              </div>
+              <div className="space-y-1 font-mono text-[11px]">
+                {paths.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+                    <span className="font-bold text-zinc-300">{p.path}</span>
+                    <Badge variant="outline" className="text-[9px] bg-amber-950/40 text-amber-300 border-amber-500/40 font-mono">
+                      HTTP 200 OK
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 17. HTTP Security Headers
+    if ('audit' in data && Array.isArray(data.audit) && data.audit.length > 0 && typeof data.audit[0] === 'object' && 'header' in data.audit[0]) {
+      const headers = data.audit as Array<{
+        header: string;
+        present: boolean;
+        value: string;
+        status: string;
+        impact?: string;
+      }>;
+      const presentCount = headers.filter(h => h.present).length;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+            <span className="text-[10px] text-zinc-400 uppercase font-semibold">Copertura Intestazioni</span>
+            <Badge variant="outline" className={cn(
+              'text-[10px] font-mono font-bold',
+              presentCount === headers.length ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+            )}>
+              {presentCount} / {headers.length} Attive
+            </Badge>
+          </div>
+
+          <div className="space-y-1 font-mono text-[11px]">
+            {headers.map((h, i) => (
+              <div key={i} className="flex items-center justify-between p-1.5 rounded-lg bg-zinc-950/40 border border-zinc-900 gap-2">
+                <span className={cn('truncate text-[10px]', h.present ? 'text-zinc-200' : 'text-zinc-500')} title={h.header}>
+                  {h.header}
+                </span>
+                <Badge variant="outline" className={cn(
+                  'text-[8px] uppercase font-bold shrink-0',
+                  h.present ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30' : 'bg-zinc-900 text-zinc-500 border-zinc-800'
+                )}>
+                  {h.present ? 'Presente' : 'Assente'}
+                </Badge>
+              </div>
+            ))}
+          </div>
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 18. DMARC Policy
+    if ('policy' in data && 'record' in data && typeof data.record === 'string' && data.record.includes('v=DMARC1')) {
+      const policy = String(data.policy || 'none');
+      const record = String(data.record || '');
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800">
+            <div>
+              <span className="text-[10px] text-zinc-500 uppercase font-semibold block">Policy Enforcement</span>
+              <span className="font-bold font-mono text-zinc-200 text-xs">p={policy}</span>
+            </div>
+            <Badge variant="outline" className={cn(
+              'text-[10px] font-bold uppercase',
+              policy === 'reject' || policy === 'quarantine' ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40' : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+            )}>
+              {policy === 'quarantine' ? 'Quarantena (Attiva)' : policy === 'reject' ? 'Rigetto Totale' : 'Monitoraggio (None)'}
+            </Badge>
+          </div>
+
+          <div className="space-y-1 font-mono text-[10px]">
+            <span className="text-zinc-500 block">Record DNS Pubblicato:</span>
+            <div className="bg-zinc-950/60 p-2 rounded border border-zinc-800 text-zinc-300 break-all leading-relaxed">
+              {record}
+            </div>
+          </div>
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 19. SPF Policy
+    if ('record' in data && typeof data.record === 'string' && data.record.includes('v=spf1')) {
+      const record = String(data.record || '');
+      const isStrict = record.includes('-all');
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800">
+            <div>
+              <span className="text-[10px] text-zinc-500 uppercase font-semibold block">Meccanismo SPF</span>
+              <span className="font-bold font-mono text-zinc-200 text-xs">{isStrict ? 'HardFail (-all)' : 'SoftFail (~all)'}</span>
+            </div>
+            <Badge variant="outline" className="bg-emerald-950/40 text-emerald-300 border-emerald-500/40 text-[10px] font-bold">
+              Configurato
+            </Badge>
+          </div>
+
+          <div className="space-y-1 font-mono text-[10px]">
+            <span className="text-zinc-500 block">Record TXT:</span>
+            <div className="bg-zinc-950/60 p-2 rounded border border-zinc-800 text-zinc-300 break-all leading-relaxed">
+              {record}
+            </div>
+          </div>
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 20. DKIM Selectors
+    if ('selectors' in data || ('message' in data && typeof data.message === 'string' && data.message.includes('DKIM'))) {
+      const selectors = Array.isArray(data.selectors) ? (data.selectors as Array<{ selector: string; found: boolean; record: string }>) : [];
+      const hasActive = selectors.length > 0;
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          {!hasActive ? (
+            <div className="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/30 text-amber-300 space-y-1">
+              <span className="font-bold block text-xs">Nessun selettore standard individuato</span>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                I selettori comuni (google, default, k1, smtp) non sono stati trovati su `_domainkey`. Se usi una chiave con selettore personalizzato, la firma è attiva ma non rilevabile automaticamente.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 font-mono text-[11px]">
+              <span className="text-[10px] text-zinc-500 uppercase font-semibold block">Selettori Rilevati ({selectors.length}):</span>
+              {selectors.map((s, i) => (
+                <div key={i} className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-zinc-200">{s.selector}._domainkey</span>
+                    <Badge variant="outline" className="bg-emerald-950/40 text-emerald-300 border-emerald-500/40 text-[9px]">
+                      Attivo
+                    </Badge>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 truncate">{s.record}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 21. DNSSEC Validation
+    if ('message' in data && typeof data.message === 'string' && data.message.includes('DNSSEC')) {
+      const isEnabled = data.status === 'pass';
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          <div className={cn(
+            'p-2.5 rounded-xl border flex items-center justify-between gap-2',
+            isEnabled ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' : 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+          )}>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Firma Crittografica Zona</span>
+              <span className="font-bold text-xs">{isEnabled ? 'DNSSEC Abilitato' : 'DNSSEC Non Rilevato'}</span>
+            </div>
+            <Badge variant="outline" className={cn(
+              'text-[10px] font-bold',
+              isEnabled ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+            )}>
+              {isEnabled ? 'Protetto' : 'Disabilitato'}
+            </Badge>
+          </div>
+
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // 22. Network Integrity & Path MTU Discovery
+    if ('dnsSecurity' in data && 'mtu' in data) {
+      const dnsSec = data.dnsSecurity as {
+        isHijacked: boolean;
+        localIps?: string[];
+        authoritativeIps?: string[];
+        assessment?: string;
+      };
+      const mtu = data.mtu as {
+        standardMtu: number;
+        recommendation: string;
+        mss: number;
+      };
+
+      return (
+        <div className="space-y-2.5 text-xs">
+          <div className={cn(
+            'p-2.5 rounded-xl border flex items-center justify-between gap-2',
+            !dnsSec.isHijacked ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300' : 'bg-red-950/30 border-red-500/40 text-red-300'
+          )}>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Integrità Risoluzione DNS</span>
+              <span className="font-bold text-xs">{!dnsSec.isHijacked ? 'DNS Autentico (Nessun Hijack)' : 'Attenzione: Discrepanza DNS!'}</span>
+            </div>
+            <Badge variant="outline" className={cn(
+              'text-[10px] font-bold',
+              !dnsSec.isHijacked ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-red-500/20 text-red-300 border-red-500/50'
+            )}>
+              {!dnsSec.isHijacked ? 'Coerente' : 'Possibile Proxy'}
+            </Badge>
+          </div>
+
+          <div className="p-2 rounded-lg bg-zinc-950/70 border border-zinc-800 space-y-1 font-mono text-[11px]">
+            <div className="flex justify-between items-center text-zinc-400">
+              <span>Path MTU Standard:</span>
+              <span className="text-cyan-300 font-bold">{mtu.standardMtu} Byte</span>
+            </div>
+            <div className="flex justify-between items-center text-zinc-400">
+              <span>TCP MSS (Segmento Max):</span>
+              <span className="text-indigo-300 font-bold">{mtu.mss} Byte</span>
+            </div>
+            <div className="text-[10px] text-zinc-500 pt-1 border-t border-zinc-900">
+              {mtu.recommendation}
+            </div>
+          </div>
+
+          {Boolean(dnsSec.assessment) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              💡 {dnsSec.assessment}
+            </p>
+          )}
         </div>
       );
     }

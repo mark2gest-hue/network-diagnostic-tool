@@ -34,7 +34,7 @@ export function SecurityAudit() {
   
   const isRunning = Object.values(loading).some(l => l);
   const completedCount = Object.values(results).filter(r => r !== null && r.status !== 'idle' && r.status !== 'running').length;
-  const progress = (completedCount / 11) * 100;
+  const progress = (completedCount / 12) * 100;
 
   const getScoreMeta = (score: number) => {
     if (score >= 80) return {
@@ -265,6 +265,14 @@ export function SecurityAudit() {
           title="RBL Email Server Blacklist" 
           description="Verifica reputazione dei server mail su blacklist globali"
           icon={ShieldX}
+        />
+        <TestCard 
+          test={results.leaks} 
+          loading={loading.leaks} 
+          onRun={() => runAll(target)} 
+          title="DeepWeb & Credential Leaks" 
+          description="Controllo breach aziendali HIBP e credenziali esposte in dump COMB (3.2B records)"
+          icon={ShieldAlert}
         />
       </div>
     </div>
