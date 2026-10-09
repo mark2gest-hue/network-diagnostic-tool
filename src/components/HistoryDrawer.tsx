@@ -103,10 +103,10 @@ export function HistoryDrawer() {
       <Button
         type="button"
         onClick={() => setIsOpen(true)}
-        variant="outline"
-        className="border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs rounded-xl px-3.5 h-8 gap-1.5 transition-all"
+        variant="ghost"
+        className="gap-3 px-3 text-[0.875rem] font-medium"
       >
-        <History className="w-3.5 h-3.5 text-blue-400" />
+        <History className="size-4" aria-hidden="true" />
         <span>Cronologia</span>
       </Button>
 

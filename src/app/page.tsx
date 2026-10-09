@@ -18,22 +18,16 @@ import {
   Globe,
   ShieldCheck,
   ShieldAlert,
-  Terminal,
   Activity,
   Server,
   Lock,
-  Mail,
-  Copy,
-  Check,
   RefreshCw,
   AlertTriangle,
   Play,
   CheckCircle2,
   XCircle,
   Wifi,
-  Radio,
   Zap,
-  Search,
   Hash,
   ArrowUpRight,
   GitCommit,
@@ -44,8 +38,20 @@ import {
   Flame,
   BookOpen,
   BarChart3,
-  ChevronDown,
+  ShieldHalf,
 } from 'lucide-react';
+import Header from '@/components/Header';
+import { Button } from '@/components/ui/button';
+import {
+  Segmented,
+  RowList,
+  ExpandableRow,
+  StatusPill,
+  ActionCard,
+  CommandBlock,
+  Callout,
+} from '@/components/ui/nd';
+import { useUiPrefs, UiTheme } from '@/hooks/useUiPrefs';
 import { TestResult, ExternalTestType } from '@/types/tests';
 
 type MainSectionTab = 'remediation' | 'external' | 'internal' | 'security' | 'vulnerabilities' | 'manual';
@@ -138,7 +144,7 @@ export default function Dashboard() {
   const [searchInput, setSearchInput] = useState<string>('aiutiamoci.cloud');
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'suite' | 'remediation'>('suite');
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [filterSeverity, setFilterSeverity] = useState<'all' | 'warn' | 'pass'>('all');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -166,8 +172,6 @@ export default function Dashboard() {
     (r) => r !== null && r.status !== 'running' && r.status !== 'idle'
   ).length;
   const totalTests = MODULES.length;
-  const progress = Math.round((finishedCount / totalTests) * 100);
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchInput.trim()) {
@@ -177,194 +181,143 @@ export default function Dashboard() {
     }
   };
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
-  };
-
-  const getStatusBadge = (test: TestResult | null, isLoading: boolean) => {
-    if (isLoading) {
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#0284c7]/20 text-[#38bdf8] border border-[#0369a1] animate-pulse">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          IN CORSO
-        </span>
-      );
-    }
-    if (!test || test.status === 'idle') {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#1e293b] text-[#94a3b8] border border-[#334155]">
-          <Play className="w-2.5 h-2.5" />
-          IN ATTESA
-        </span>
-      );
-    }
-    const s = String(test.status).toLowerCase();
-    if (['pass', 'success', 'passed', 'propagated', 'ok'].includes(s)) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#064e3b]/80 text-[#34d399] border border-[#059669]">
-          <CheckCircle2 className="w-3 h-3" />
-          SUPERATO
-        </span>
-      );
-    }
-    if (['warning', 'warn', 'attention'].includes(s)) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#451a03]/80 text-[#fbbf24] border border-[#b45309]">
-          <AlertTriangle className="w-3 h-3" />
-          ATTENZIONE
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#450a0a]/80 text-[#f87171] border border-[#b91c1c]">
-        <XCircle className="w-3 h-3" />
-        FALLITO
-      </span>
-    );
-  };
-
   const [perspectiveMode, setPerspectiveMode] = useState<'executive' | 'it-pro'>('executive');
   const [showActiveDefenseModal, setShowActiveDefenseModal] = useState<boolean>(false);
 
   const navTabs: Array<{ id: MainSectionTab; label: string; sublabel: string; icon: React.ElementType; badge?: string }> = [
-    { id: 'remediation', label: 'Riepilogo & Bonifica', sublabel: 'Score, Grafici & Download PDF', icon: BarChart3, badge: 'EXECUTIVE' },
-    { id: 'external', label: 'External Diagnostics', sublabel: 'DNS Anycast, TTFB, SSL, Port Scanner', icon: Globe, badge: '12 MODULI' },
-    { id: 'internal', label: 'Internal / LAN & WiFi', sublabel: 'Client Speedtest, ARP Subnet Sweep', icon: Wifi, badge: 'CLIENT & LAN' },
-    { id: 'security', label: 'Security Audit', sublabel: 'SPF, DKIM, DMARC, Blacklist & Threat Radar', icon: ShieldCheck, badge: 'SCORE 0-100' },
-    { id: 'vulnerabilities', label: 'Vulnerability Scanner', sublabel: 'File Esposti, CORS, Clickjacking & CVE', icon: Flame, badge: 'EXPLOIT RADAR' },
-    { id: 'manual', label: 'Manuale & Guida Operativa', sublabel: 'Playbook Sistemistico & Conformità NIS2', icon: BookOpen, badge: 'DOCS & PDF' },
+    { id: 'remediation', label: 'Riepilogo', sublabel: 'Score, Grafici & Download PDF', icon: BarChart3, badge: 'EXECUTIVE' },
+    { id: 'external', label: 'Diagnostica esterna', sublabel: 'DNS Anycast, TTFB, SSL, Port Scanner', icon: Globe, badge: '12 MODULI' },
+    { id: 'internal', label: 'Rete interna e WiFi', sublabel: 'Client Speedtest, ARP Subnet Sweep', icon: Wifi, badge: 'CLIENT & LAN' },
+    { id: 'security', label: 'Audit di sicurezza', sublabel: 'SPF, DKIM, DMARC, Blacklist & Threat Radar', icon: ShieldCheck, badge: 'SCORE 0-100' },
+    { id: 'vulnerabilities', label: 'Vulnerabilità', sublabel: 'File Esposti, CORS, Clickjacking & CVE', icon: Flame, badge: 'EXPLOIT RADAR' },
+    { id: 'manual', label: 'Manuale operativo', sublabel: 'Playbook Sistemistico & Conformità NIS2', icon: BookOpen, badge: 'DOCS & PDF' },
   ];
+  const ui = useUiPrefs();
 
   const activeTabMeta = navTabs.find((t) => t.id === activeSection) || navTabs[0];
-  const ActiveIcon = activeTabMeta.icon;
+
+  const navItemCls = (active: boolean) =>
+    `flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.875rem] font-medium transition-colors ${
+      active ? 'bg-accent-bg text-accent font-semibold' : 'text-ink-2 hover:bg-hover hover:text-foreground'
+    }`;
+  const showDomainBar = activeSection === 'remediation' || activeSection === 'external';
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-[#d1d5db] font-mono selection:bg-[#00f0ff] selection:text-black antialiased pb-12">
-      {/* Clean HUD Navigation Bar with Dropdown Selector & Dual-View Switch */}
-      <nav className="bg-[#090d16] border-b border-[#192336] px-4 py-2 sticky top-0 z-40 backdrop-blur-md">
-        <div className="max-w-[1720px] mx-auto flex items-center justify-between gap-3">
-          {/* Left: View Mode Toggle (Executive vs IT Pro) & Module Selector */}
-          <div className="flex items-center gap-3">
-            {/* View Mode Switcher */}
-            <div className="flex items-center bg-[#070b14] border border-[#1e2d45] rounded-md p-0.5 text-xs">
-              <button
-                type="button"
-                onClick={() => setPerspectiveMode('executive')}
-                className={`px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  perspectiveMode === 'executive'
-                    ? 'bg-[#00f0ff] text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]'
-                    : 'text-[#94a3b8] hover:text-white'
-                }`}
-              >
-                <span>👔 Direzione</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPerspectiveMode('it-pro')}
-                className={`px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  perspectiveMode === 'it-pro'
-                    ? 'bg-[#3b82f6] text-white shadow-[0_0_12px_rgba(59,130,246,0.4)]'
-                    : 'text-[#94a3b8] hover:text-white'
-                }`}
-              >
-                <span>💻 IT Pro / SOC</span>
-              </button>
-            </div>
+    <div className="min-h-screen bg-background text-foreground lg:flex">
+      {/* Sidebar: un solo livello, sezioni sempre visibili */}
+      <aside className="border-b border-border bg-surface lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-[232px] lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <div className="px-5 pb-2 pt-5">
+          <div className="text-[1.0625rem] font-bold leading-tight">NetworkDiag</div>
+          <div className="text-[0.8125rem] text-ink-3">by aiutiamoci</div>
+        </div>
 
-            {/* Module Selector Dropdown */}
-            <div className="relative" ref={dropdownRef}>
+        <nav aria-label="Sezioni" className="flex flex-wrap gap-1 px-3 py-2 lg:flex-col lg:flex-nowrap">
+          {navTabs.map((tab) => {
+            const TabIcon = tab.icon;
+            const isSelected = activeSection === tab.id;
+            return (
               <button
+                key={tab.id}
                 type="button"
-                onClick={() => setIsDropdownOpen((prev) => !prev)}
-                className="bg-[#0e1628] hover:bg-[#152038] text-white border border-[#24334f] hover:border-[#00f0ff] px-3.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-2.5 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,0,0,0.3)] select-none"
+                aria-current={isSelected ? 'page' : undefined}
+                onClick={() => setActiveSection(tab.id)}
+                className={`${navItemCls(isSelected)} w-auto lg:w-full`}
               >
-                <div className="p-1 rounded bg-[#131d33] text-[#00f0ff]">
-                  <ActiveIcon className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left flex items-center gap-2">
-                  <span className="tracking-wide">{activeTabMeta.label}</span>
-                  {activeTabMeta.badge && (
-                    <span className="text-[9px] bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/30 px-1.5 py-0.2 rounded font-mono font-normal">
-                      {activeTabMeta.badge}
-                    </span>
-                  )}
-                </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-[#94a3b8] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[#00f0ff]' : ''}`} />
+                <TabIcon className="size-4 shrink-0" aria-hidden="true" />
+                {tab.label}
               </button>
+            );
+          })}
+        </nav>
 
-            {/* Dropdown Floating Popover */}
-            {isDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-80 bg-[#0a0f1c] border border-[#1e2d45] rounded-md shadow-2xl z-50 p-1.5 space-y-1 backdrop-blur-xl">
-                <div className="px-2.5 py-1.5 text-[10px] text-[#64748b] font-bold uppercase tracking-wider border-b border-[#172236]">
-                  Seleziona Modulo Diagnostico
-                </div>
-                  {navTabs.map((tab) => {
-                    const TabIcon = tab.icon;
-                    const isSelected = activeSection === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          setActiveSection(tab.id);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full text-left p-2 rounded flex items-center justify-between transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#121e36] text-[#00f0ff] border border-[#00f0ff]/40 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                            : 'text-[#94a3b8] hover:text-white hover:bg-[#0e1628]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <TabIcon className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#00f0ff]' : 'text-[#64748b]'}`} />
-                          <div>
-                            <div className="text-xs font-bold text-white">{tab.label}</div>
-                            <div className="text-[10px] text-[#64748b]">{tab.sublabel}</div>
-                          </div>
-                        </div>
-                        {tab.badge && (
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono shrink-0 ${
-                            isSelected ? 'bg-[#00f0ff]/20 text-[#00f0ff]' : 'bg-[#182338] text-[#64748b]'
-                          }`}>
-                            {tab.badge}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+        {activeSection === 'remediation' && (
+          <div className="px-5 pb-2 pt-1">
+            <div className="mb-1.5 text-[0.8125rem] text-ink-3">Vista</div>
+            <Segmented
+              label="Vista del riepilogo"
+              value={perspectiveMode}
+              onChange={setPerspectiveMode}
+              className="w-full"
+              options={[
+                { value: 'executive', label: 'Direzione' },
+                { value: 'it-pro', label: 'IT Pro' },
+              ]}
+            />
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 border-t border-border px-3 py-4 lg:mt-auto">
+          <div className="px-2">
+            <div className="mb-1.5 text-[0.8125rem] text-ink-3">Tema</div>
+            <Segmented<UiTheme>
+              label="Tema dell'interfaccia"
+              value={ui.theme}
+              onChange={ui.changeTheme}
+              className="grid w-full grid-cols-2"
+              options={[
+                { value: 'light', label: 'Chiaro' },
+                { value: 'dark', label: 'Scuro' },
+                { value: 'comfort', label: 'Comfort' },
+                { value: 'auto', label: 'Automatico' },
+              ]}
+            />
+            <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2 text-[0.875rem] text-ink-2">
+              <input
+                type="checkbox"
+                checked={ui.largeText}
+                onChange={(e) => ui.changeLargeText(e.target.checked)}
+                className="size-4 accent-[var(--accent)]"
+              />
+              Testo grande
+            </label>
+          </div>
+
+          <button type="button" onClick={() => setShowActiveDefenseModal(true)} className={navItemCls(false)}>
+            <ShieldHalf className="size-4 shrink-0" aria-hidden="true" />
+            Sentinel
+          </button>
+          <Header />
+        </div>
+      </aside>
+
+      <div className="min-w-0 flex-1 lg:pl-[232px]">
+        {/* Barra superiore: un solo campo dominio, un solo pulsante primario */}
+        {showDomainBar && (
+          <form
+            onSubmit={handleSearchSubmit}
+            className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3 sm:px-6"
+          >
+            <label htmlFor="domain-input" className="text-[0.8125rem] text-ink-2">Dominio analizzato</label>
+            <input
+              id="domain-input"
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="esempio.it o indirizzo IP"
+              spellCheck={false}
+              className="min-h-11 w-full max-w-xs flex-1 rounded-md border border-field-border bg-field px-3 font-mono text-[0.875rem] text-foreground outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            />
+            {activeSection === 'external' && (
+              <button
+                type="submit"
+                disabled={activeCount > 0}
+                className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-4 text-[0.875rem] font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-60"
+              >
+                {activeCount > 0 && <RefreshCw className="size-4 animate-spin" aria-hidden="true" />}
+                {activeCount > 0 ? `In esecuzione (${activeCount})…` : `Esegui tutti (${totalTests})`}
+              </button>
             )}
-          </div>
-        </div>
+          </form>
+        )}
 
-          {/* Right Indicator: Active Target & Active Defense Button */}
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => setShowActiveDefenseModal(true)}
-              className="bg-[#450a0a] hover:bg-[#7f1d1d] text-[#fca5a5] border border-[#b91c1c] px-2.5 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.2)]"
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-[#ef4444]" />
-              <span className="hidden sm:inline">Scudo Attivo & Alert</span>
-            </button>
-            <span className="text-[#64748b]">TARGET:</span>
-            <span className="text-[#00f0ff] font-mono font-bold bg-[#0e1628] border border-[#1f2d45] px-2.5 py-1 rounded">
-              {target}
-            </span>
-          </div>
-        </div>
-      </nav>
-
-      {/* Active Defense & Alerting Sentinel Modal */}
+      {/* Sentinel */}
       <ActiveDefenseModal
         target={target}
         isOpen={showActiveDefenseModal}
         onClose={() => setShowActiveDefenseModal(false)}
       />
 
-      {/* Main Content Area */}
-      <main className="max-w-[1720px] mx-auto p-4 space-y-4">
+      <main className="mx-auto w-full max-w-[960px] space-y-4 px-4 py-8 sm:px-6">
         {/* ========================================================================= */}
         {/* TAB 0: EXECUTIVE SUMMARY & REMEDIATION PLAN */}
         {/* ========================================================================= */}
@@ -377,227 +330,250 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {activeSection === 'external' && (
           <div className="space-y-4">
-            {/* Prominent Target Search & Controls Box */}
-            <div className="bg-[#0b101c] border border-[#1d2b42] rounded-md p-4 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-[#00f0ff]" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-                    Target di Scansione: <span className="text-[#00f0ff] font-mono">{target}</span>
-                  </h3>
-                </div>
-                <p className="text-[11px] text-[#94a3b8]">
-                  Digita qualsiasi dominio aziendale o IPv4 e premi Invio o &quot;Esegui Tutti&quot;.
+            {/* Intestazione Sezione Diagnostica Esterna */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+              <div>
+                <h1 className="text-[1.625rem] font-bold leading-tight text-foreground">
+                  {viewMode === 'suite' ? 'Diagnostica esterna' : 'Rimedi e comandi'}
+                </h1>
+                <p className="mt-1 text-[0.9375rem] text-ink-2">
+                  {viewMode === 'suite'
+                    ? `${totalTests} moduli completati alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}. ${
+                        Object.values(results).filter(r => r && (String(r.status) === 'warning' || String(r.status) === 'warn' || r.status === 'fail')).length
+                      } richiedono attenzione.`
+                    : '6 interventi ordinati per priorità. Sostituire i valori tra parentesi quadre prima di eseguire.'}
                 </p>
               </div>
 
-              <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 max-w-xl">
-                <div className="relative w-full">
-                  <Search className="w-4 h-4 text-[#6b7280] absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="Digita dominio o IP (es. cavalli.it, google.com)..."
-                    className="w-full bg-[#070a12] border border-[#24334f] focus:border-[#00f0ff] focus:ring-1 focus:ring-[#00f0ff] text-white text-xs px-3 py-2.5 pl-9 rounded font-mono transition-all outline-none"
-                  />
+              {/* Controllo segmentato: Diagnostica / Rimedi e comandi */}
+              <Segmented<'suite' | 'remediation'>
+                label="Modalità diagnostica"
+                value={viewMode}
+                onChange={setViewMode}
+                options={[
+                  { value: 'suite', label: 'Diagnostica' },
+                  { value: 'remediation', label: 'Rimedi e comandi' },
+                ]}
+              />
+            </div>
+
+            {/* Modalità 1: 12 Moduli come lista di righe espandibili con filtri */}
+            {viewMode === 'suite' && (
+              <div className="space-y-4">
+                {/* Filtri: Tutti / Attenzione / Superati */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFilterSeverity('all')}
+                    className={`min-h-9 px-3 rounded-full text-xs font-semibold border transition-all ${
+                      filterSeverity === 'all'
+                        ? 'bg-accent-bg text-accent border-accent/40'
+                        : 'bg-surface text-ink-2 border-border hover:bg-hover'
+                    }`}
+                  >
+                    Tutti {totalTests}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterSeverity('warn')}
+                    className={`min-h-9 px-3 rounded-full text-xs font-semibold border transition-all ${
+                      filterSeverity === 'warn'
+                        ? 'bg-accent-bg text-accent border-accent/40'
+                        : 'bg-surface text-ink-2 border-border hover:bg-hover'
+                    }`}
+                  >
+                    Attenzione {
+                      Object.values(results).filter(r => r && (String(r.status) === 'warning' || String(r.status) === 'warn' || r.status === 'fail')).length
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterSeverity('pass')}
+                    className={`min-h-9 px-3 rounded-full text-xs font-semibold border transition-all ${
+                      filterSeverity === 'pass'
+                        ? 'bg-accent-bg text-accent border-accent/40'
+                        : 'bg-surface text-ink-2 border-border hover:bg-hover'
+                    }`}
+                  >
+                    Superati {
+                      Object.values(results).filter(r => r && (['pass', 'success', 'passed', 'ok', 'propagated'].includes(String(r.status).toLowerCase()))).length
+                    }
+                  </button>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={activeCount > 0}
-                  className="bg-[#00f0ff] hover:bg-[#38bdf8] text-black font-bold text-xs px-5 py-2.5 rounded flex items-center gap-2 shrink-0 transition-all disabled:opacity-50 cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.25)] whitespace-nowrap"
-                >
-                  {activeCount > 0 ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                  )}
-                  <span>{activeCount > 0 ? `ESECUZIONE (${activeCount})...` : 'ESEGUI TUTTI (12)'}</span>
-                </button>
-              </form>
-            </div>
+                {/* Lista ordinata: problemi in cima */}
+                <RowList>
+                  {MODULES.slice()
+                    .sort((a, b) => {
+                      const resA = results[a.type]?.status || 'idle';
+                      const resB = results[b.type]?.status || 'idle';
+                      const isWarnA = ['warn', 'warning', 'fail'].includes(String(resA).toLowerCase());
+                      const isWarnB = ['warn', 'warning', 'fail'].includes(String(resB).toLowerCase());
+                      if (isWarnA && !isWarnB) return -1;
+                      if (!isWarnA && isWarnB) return 1;
+                      return 0;
+                    })
+                    .filter((mod) => {
+                      if (filterSeverity === 'all') return true;
+                      const status = String(results[mod.type]?.status || '').toLowerCase();
+                      if (filterSeverity === 'warn') return ['warn', 'warning', 'fail'].includes(status);
+                      if (filterSeverity === 'pass') return ['pass', 'success', 'passed', 'ok', 'propagated'].includes(status);
+                      return true;
+                    })
+                    .map((mod) => {
+                      const testResult = results[mod.type];
+                      const isLoading = loading[mod.type];
+                      const statusStr = String(testResult?.status || 'idle').toLowerCase();
+                      const isWarn = ['warning', 'warn', 'attention', 'fail'].includes(statusStr);
+                      const isPass = ['pass', 'success', 'passed', 'propagated', 'ok'].includes(statusStr);
 
-            {/* View Toggle Tabs & Status */}
-            <div className="flex items-center justify-between border-b border-[#1c2940] pb-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setViewMode('suite')}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                    viewMode === 'suite'
-                      ? 'bg-[#0e1628] text-[#00f0ff] border border-[#00f0ff]/50'
-                      : 'text-[#94a3b8] hover:text-white'
-                  }`}
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>12 MODULI DIAGNOSTICI ESTERNI</span>
-                </button>
+                      let pillTone: 'ok' | 'warn' | 'low' | 'pending' = 'pending';
+                      let pillLabel = 'In attesa';
+                      if (isLoading) {
+                        pillTone = 'pending';
+                        pillLabel = 'In corso';
+                      } else if (isPass) {
+                        pillTone = 'ok';
+                        pillLabel = 'Superato';
+                      } else if (isWarn) {
+                        pillTone = 'warn';
+                        pillLabel = 'Attenzione';
+                      }
 
-                <button
-                  onClick={() => setViewMode('remediation')}
-                  className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                    viewMode === 'remediation'
-                      ? 'bg-[#0e1628] text-[#fde047] border border-[#fde047]/50'
-                      : 'text-[#94a3b8] hover:text-white'
-                  }`}
-                >
-                  <Terminal className="w-3.5 h-3.5" />
-                  <span>TACTICAL REMEDIATION & CLI</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3 text-[11px]">
-                <span className="text-[#64748b]">
-                  Completati: <span className="text-white font-mono">{finishedCount} / {totalTests} ({progress}%)</span>
-                </span>
-                <span className="text-[#10b981] font-bold flex items-center gap-1">
-                  <Radio className="w-3 h-3 animate-pulse" />
-                  ONLINE
-                </span>
-              </div>
-            </div>
-
-            {/* Mode 1: 12 Interactive Diagnostic Cards */}
-            {viewMode === 'suite' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {MODULES.map((mod) => {
-                  const testResult = results[mod.type];
-                  const isLoading = loading[mod.type];
-                  const Icon = mod.icon;
-
-                  return (
-                    <div
-                      key={mod.type}
-                      className={`bg-[#0b101c] border rounded-md p-3.5 shadow-lg flex flex-col justify-between transition-all duration-200 ${
-                        isLoading
-                          ? 'border-[#0284c7] shadow-[0_0_15px_rgba(2,132,199,0.15)]'
-                          : testResult?.status === 'pass'
-                          ? 'border-[#1c2940] hover:border-[#059669]/60'
-                          : testResult?.status === 'fail'
-                          ? 'border-[#1c2940] hover:border-[#dc2626]/60'
-                          : 'border-[#1c2940] hover:border-[#2d3f60]'
-                      }`}
-                    >
-                      {/* Card Header */}
-                      <div className="flex items-start justify-between gap-2 border-b border-[#172236] pb-2.5 mb-2.5">
-                        <div className="flex items-start gap-2.5 min-w-0">
-                          <div className="p-2 rounded bg-[#0e1628] border border-[#23334f] text-[#00f0ff] shrink-0 mt-0.5">
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="text-xs font-bold text-white tracking-wide truncate" title={mod.title}>
-                              {mod.title}
-                            </h3>
-                            <p className="text-[11px] text-[#64748b] mt-0.5 line-clamp-1" title={mod.description}>
-                              {mod.description}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {getStatusBadge(testResult, isLoading)}
-                          <button
-                            onClick={() => runTest(mod.type, target)}
-                            disabled={isLoading}
-                            title={`Esegui ${mod.title}`}
-                            className="p-1.5 bg-[#0e1628] hover:bg-[#1a253d] text-[#94a3b8] hover:text-[#00f0ff] border border-[#23334f] rounded transition-all cursor-pointer disabled:opacity-50"
-                          >
-                            {isLoading ? (
-                              <RefreshCw className="w-3 h-3 animate-spin text-[#00f0ff]" />
+                      return (
+                        <ExpandableRow
+                          key={mod.type}
+                          defaultOpen={isWarn}
+                          status={<StatusPill tone={pillTone}>{pillLabel}</StatusPill>}
+                          title={mod.title}
+                          summary={mod.description}
+                          value={
+                            testResult?.result && typeof testResult.result === 'object' && 'response_time' in testResult.result
+                              ? `${(testResult.result as { response_time: number }).response_time} ms`
+                              : undefined
+                          }
+                          action={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => runTest(mod.type, target)}
+                              disabled={isLoading}
+                              className="text-xs"
+                            >
+                              {isLoading ? (
+                                <RefreshCw className="size-3.5 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <Play className="size-3.5 mr-1" aria-hidden="true" />
+                              )}
+                              Esegui
+                            </Button>
+                          }
+                        >
+                          <div className="space-y-3 pt-2">
+                            {testResult && testResult.status !== 'idle' ? (
+                              <div className="rounded-md border border-border bg-field p-3 text-xs">
+                                <ResultRenderer testId={mod.type} result={testResult.result} />
+                              </div>
                             ) : (
-                              <Play className="w-3 h-3 fill-current" />
+                              <p className="text-xs text-ink-3">Nessun dato registrato. Premi &quot;Esegui&quot; per avviare il controllo.</p>
                             )}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Card Content & Result Body */}
-                      <div className="flex-1 min-h-[120px] text-xs">
-                        {testResult && testResult.status !== 'idle' ? (
-                          <div className="bg-[#070a12] p-2.5 rounded border border-[#141d2e] overflow-x-auto max-h-72">
-                            <ResultRenderer testId={mod.type} result={testResult.result} />
                           </div>
-                        ) : (
-                          <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-[#1a2538] rounded bg-[#080d17]/50 text-[#4b5563]">
-                            <Icon className="w-6 h-6 mb-1 text-[#334155]" />
-                            <span className="text-[11px]">Nessun dato registrato.</span>
-                            <span className="text-[10px] text-[#64748b]">Premi Play per avviare il test.</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Card Footer Info */}
-                      {testResult?.timestamp && (
-                        <div className="mt-2.5 pt-2 border-t border-[#172236] flex items-center justify-between text-[10px] text-[#64748b]">
-                          <span>Timestamp: {new Date(testResult.timestamp).toLocaleTimeString('it-IT')}</span>
-                          <span className="text-[#00f0ff]">ID: {mod.type}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        </ExpandableRow>
+                      );
+                    })}
+                </RowList>
               </div>
             )}
 
-            {/* Mode 2: Tactical Remediation Snippets */}
+            {/* Modalità 2: Rimedi e comandi (6 schede azione ordinate) */}
             {viewMode === 'remediation' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="bg-[#0b101c] border border-[#1d2b42] rounded-md p-4 space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#1d2b42] pb-2">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="w-4 h-4 text-[#00f0ff]" />
-                      <h3 className="text-xs font-bold text-white uppercase">Nginx Security Hardening</h3>
-                    </div>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(
-                          `# Nginx Security Configuration per ${target}\nadd_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;\nadd_header X-Content-Type-Options "nosniff" always;\nadd_header X-Frame-Options "DENY" always;\nadd_header X-XSS-Protection "1; mode=block" always;\nadd_header Referrer-Policy "strict-origin-when-cross-origin" always;`,
-                          'nginx-all'
-                        )
-                      }
-                      className="text-xs text-[#00f0ff] hover:text-white flex items-center gap-1 cursor-pointer"
-                    >
-                      {copiedKey === 'nginx-all' ? <Check className="w-3.5 h-3.5 text-[#10b981]" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedKey === 'nginx-all' ? 'Copiato!' : 'Copia Tutto'}</span>
-                    </button>
-                  </div>
+              <div className="space-y-4">
+                <ActionCard
+                  n={1}
+                  title="Attivare il blocco DMARC"
+                  why="DMARC è in osservazione (p=none): le email false non vengono fermate. Dopo qualche settimana di report senza anomalie, passare alla quarantena. Modificare il record TXT esistente nel pannello DNS."
+                  priority={<StatusPill tone="warn">Priorità media</StatusPill>}
+                >
+                  <CommandBlock
+                    label="Record TXT su _dmarc.aiutiamoci.cloud"
+                    command={`v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-reports@${target}`}
+                  />
+                  <CommandBlock
+                    label="Verifica dopo la propagazione"
+                    command={`dig +short TXT _dmarc.${target}`}
+                  />
+                  <Callout tone="warn" title="Attenzione">
+                    Controllare prima i report: se un servizio legittimo (newsletter, CRM) non è in SPF, le sue email finiranno in spam.
+                  </Callout>
+                  <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-2 cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-[var(--accent)]" />
+                    Segna come fatto
+                  </label>
+                </ActionCard>
 
-                  <pre className="bg-[#070a12] p-3 rounded border border-[#182338] text-[11px] font-mono text-[#38bdf8] overflow-x-auto">
-{`# Nginx Security Configuration per ${target}
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-Frame-Options "DENY" always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;`}
-                  </pre>
-                </div>
+                <ActionCard
+                  n={2}
+                  title="Limitare la porta SSH agli IP aziendali"
+                  why="Facoltativo: la porta 22 è già protetta da chiave, ma oggi è raggiungibile da tutta Internet."
+                  priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
+                >
+                  <CommandBlock
+                    label="Regola firewall UFW"
+                    command="sudo ufw allow from 1.2.3.4 to any port 22 proto tcp"
+                  />
+                  <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-2 cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-[var(--accent)]" />
+                    Segna come fatto
+                  </label>
+                </ActionCard>
 
-                <div className="bg-[#0b101c] border border-[#1d2b42] rounded-md p-4 space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#1d2b42] pb-2">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-[#a855f7]" />
-                      <h3 className="text-xs font-bold text-white uppercase">Mail Authentication DNS Zone</h3>
-                    </div>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(
-                          `; Mail DNS Zone Records per ${target}\n${target}. IN TXT "v=spf1 include:_spf.google.com ~all"\n_dmarc.${target}. IN TXT "v=DMARC1; p=reject; sp=reject; pct=100; rua=mailto:dmarc-reports@${target}; aspf=r;"`,
-                          'dns-zone'
-                        )
-                      }
-                      className="text-xs text-[#00f0ff] hover:text-white flex items-center gap-1 cursor-pointer"
-                    >
-                      {copiedKey === 'dns-zone' ? <Check className="w-3.5 h-3.5 text-[#10b981]" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedKey === 'dns-zone' ? 'Copiato!' : 'Copia Tutto'}</span>
-                    </button>
-                  </div>
+                <ActionCard
+                  n={3}
+                  title="Impostare il record PTR"
+                  why={`Nessun record inverso per 80.225.81.150: può penalizzare la posta in uscita.`}
+                  priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
+                >
+                  <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-2 cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-[var(--accent)]" />
+                    Segna come fatto
+                  </label>
+                </ActionCard>
 
-                  <pre className="bg-[#070a12] p-3 rounded border border-[#182338] text-[11px] font-mono text-[#c084fc] overflow-x-auto">
-{`; Mail DNS Zone Records per ${target}
-${target}. IN TXT "v=spf1 include:_spf.google.com ~all"
-_dmarc.${target}. IN TXT "v=DMARC1; p=reject; sp=reject; pct=100; rua=mailto:dmarc-reports@${target}; aspf=r;"`}
-                  </pre>
-                </div>
+                <ActionCard
+                  n={4}
+                  title="Aggiungere il record AAAA (IPv6)"
+                  why="Il dominio risponde solo su IPv4."
+                  priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
+                >
+                  <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-2 cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-[var(--accent)]" />
+                    Segna come fatto
+                  </label>
+                </ActionCard>
+
+                <ActionCard
+                  n={5}
+                  title="Aggiungere una Content-Security-Policy"
+                  why="Completa l'hardening del web server, che oggi ha già HSTS e X-Frame-Options."
+                  priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
+                >
+                  <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-2 cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-[var(--accent)]" />
+                    Segna come fatto
+                  </label>
+                </ActionCard>
+
+                <ActionCard
+                  n={6}
+                  title="Valutare un proxy WAF davanti al server"
+                  why="Il traffico arriva direttamente all'IP del server, senza protezione da attacchi di sovraccarico."
+                  priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
+                >
+                  <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-2 cursor-pointer">
+                    <input type="checkbox" className="size-4 accent-[var(--accent)]" />
+                    Segna come fatto
+                  </label>
+                </ActionCard>
               </div>
             )}
 
@@ -642,6 +618,7 @@ _dmarc.${target}. IN TXT "v=DMARC1; p=reject; sp=reject; pct=100; rua=mailto:dma
           </div>
         )}
       </main>
+      </div>
 
       {/* Export Master Report Modal (All Modules Included) */}
       <ExportReportModal

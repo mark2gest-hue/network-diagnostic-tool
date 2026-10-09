@@ -10,44 +10,36 @@ const config: Config = {
   theme: {
   	extend: {
   		colors: {
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
-  			},
-  			popover: {
-  				DEFAULT: 'hsl(var(--popover))',
-  				foreground: 'hsl(var(--popover-foreground))'
-  			},
-  			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
-  			},
-  			secondary: {
-  				DEFAULT: 'hsl(var(--secondary))',
-  				foreground: 'hsl(var(--secondary-foreground))'
-  			},
-  			muted: {
-  				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
-  			},
-  			accent: {
-  				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
-  			},
-  			destructive: {
-  				DEFAULT: 'hsl(var(--destructive))',
-  				foreground: 'hsl(var(--destructive-foreground))'
-  			},
-  			border: 'hsl(var(--border))',
-  			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))',
+  			background: 'var(--bg)',
+  			foreground: 'var(--text)',
+  			surface: 'var(--surface)',
+  			hover: 'var(--hover)',
+  			field: { DEFAULT: 'var(--field-bg)', border: 'var(--field-border)' },
+  			ink: { DEFAULT: 'var(--text)', 2: 'var(--text-2)', 3: 'var(--text-3)' },
+  			card: { DEFAULT: 'var(--surface)', foreground: 'var(--text)' },
+  			popover: { DEFAULT: 'var(--surface)', foreground: 'var(--text)' },
+  			primary: { DEFAULT: 'var(--accent)', foreground: 'var(--on-accent)' },
+  			secondary: { DEFAULT: 'var(--hover)', foreground: 'var(--text)' },
+  			muted: { DEFAULT: 'var(--hover)', foreground: 'var(--text-3)' },
+  			accent: { DEFAULT: 'var(--accent)', bg: 'var(--accent-bg)', foreground: 'var(--on-accent)' },
+  			destructive: { DEFAULT: 'var(--crit)', foreground: 'var(--crit-bg)' },
+  			ok: { DEFAULT: 'var(--ok)', bg: 'var(--ok-bg)' },
+  			warn: { DEFAULT: 'var(--warn)', bg: 'var(--warn-bg)', strong: 'var(--warn-strong)', border: 'var(--warn-border)' },
+  			neutral: { DEFAULT: 'var(--neutral)', bg: 'var(--neutral-bg)' },
+  			crit: { DEFAULT: 'var(--crit)', bg: 'var(--crit-bg)' },
+  			cmd: { DEFAULT: 'var(--cmd-bg)', text: 'var(--cmd-text)' },
+  			border: 'var(--border)',
+  			input: 'var(--field-border)',
+  			ring: 'var(--accent)',
+  		},
+  		fontFamily: {
+  			sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+  			mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
   		},
   		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			lg: '12px',
+  			md: '8px',
+  			sm: '6px'
   		},
   		keyframes: {
   			'accordion-down': {

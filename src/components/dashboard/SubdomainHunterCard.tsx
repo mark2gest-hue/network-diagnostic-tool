@@ -3,16 +3,13 @@
 import React, { useState } from 'react';
 import {
   Globe,
-  ShieldAlert,
   ShieldCheck,
   Search,
   RefreshCw,
   AlertTriangle,
   Server,
-  ArrowUpRight,
   Copy,
   Check,
-  ExternalLink,
   Layers,
 } from 'lucide-react';
 

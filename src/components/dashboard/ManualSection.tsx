@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { 
-  BookOpen, 
   Download, 
   Shield, 
   Globe, 
@@ -148,203 +147,56 @@ export function ManualSection() {
   return (
     <div className="space-y-6">
       {/* Section Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center justify-between pb-6 border-b border-zinc-800/80">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <h2 className="text-2xl font-black text-white tracking-tight">
-              Manuale Operativo & Documentazione Tecnica EASM
-            </h2>
-          </div>
-          <p className="text-sm text-zinc-400 max-w-2xl">
-            Guida passo-passo per comprendere le metriche diagnostiche, risolvere le vulnerabilità, monitorare il drift post-deploy e sfruttare l&apos;AI Remediation Copilot.
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <div>
+          <h1 className="text-[1.625rem] font-bold leading-tight text-foreground">
+            Manuale operativo e documentazione tecnica
+          </h1>
+          <p className="mt-1 text-[0.9375rem] text-ink-2">
+            Guida metodologica, soglie di riferimento, buone pratiche e procedure di bonifica.
           </p>
         </div>
 
         <Button
+          variant="outline"
           onClick={downloadPdfManual}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl px-5 py-5 shadow-lg shadow-emerald-600/25 border border-emerald-400/20 transition-all flex items-center gap-2"
+          className="text-xs"
         >
-          <Download className="w-4 h-4 mr-1.5" />
-          Scarica Manuale Completo in PDF
+          <Download className="size-3.5 mr-2" aria-hidden="true" />
+          Scarica manuale PDF
         </Button>
       </div>
 
-      {/* 7 Topic Selector Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <button
-          onClick={() => setActiveTab('external')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'external'
-              ? 'bg-blue-950/40 border-blue-500/50 shadow-lg shadow-blue-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <Globe className={`w-5 h-5 ${activeTab === 'external' ? 'text-blue-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'external' ? 'bg-blue-500/20 text-blue-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 1
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'external' ? 'text-white' : 'text-zinc-300'}`}>
-              Diagnostica
-            </span>
-            <span className="text-[11px] text-zinc-400">DNS, TTFB</span>
-          </div>
-        </button>
+      {/* Layout a 2 colonne: Indice capitoli a sinistra, Contenuto a destra */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+        {/* Indice capitoli a sinistra */}
+        <div className="space-y-1 rounded-lg border border-border bg-surface p-2">
+          {[
+            { id: 'external', title: '1. Diagnostica esterna' },
+            { id: 'lan', title: '2. Rete interna e WiFi' },
+            { id: 'vulnerabilities', title: '3. Vulnerabilità' },
+            { id: 'easm', title: '4. Postura EASM e drift' },
+            { id: 'ai', title: '5. AI Remediation Copilot' },
+            { id: 'vps', title: '6. Hardening VPS e server' },
+            { id: 'playbook', title: '7. Playbook audit clienti' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`w-full text-left px-3 py-2.5 rounded-md text-xs font-semibold transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-accent-bg text-accent font-bold'
+                  : 'text-ink-2 hover:bg-hover hover:text-foreground'
+              }`}
+            >
+              {tab.title}
+            </button>
+          ))}
+        </div>
 
-        <button
-          onClick={() => setActiveTab('lan')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'lan'
-              ? 'bg-emerald-950/40 border-emerald-500/50 shadow-lg shadow-emerald-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <Wifi className={`w-5 h-5 ${activeTab === 'lan' ? 'text-emerald-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'lan' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 2
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'lan' ? 'text-white' : 'text-zinc-300'}`}>
-              Rete Locale
-            </span>
-            <span className="text-[11px] text-zinc-400">ARP, Gateway</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('vulnerabilities')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'vulnerabilities'
-              ? 'bg-red-950/40 border-red-500/50 shadow-lg shadow-red-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <Shield className={`w-5 h-5 ${activeTab === 'vulnerabilities' ? 'text-red-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'vulnerabilities' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 3
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'vulnerabilities' ? 'text-white' : 'text-zinc-300'}`}>
-              Vulnerabilità
-            </span>
-            <span className="text-[11px] text-zinc-400">.env, Cookie</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('easm')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'easm'
-              ? 'bg-amber-950/40 border-amber-500/50 shadow-lg shadow-amber-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <Zap className={`w-5 h-5 ${activeTab === 'easm' ? 'text-amber-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'easm' ? 'bg-amber-500/20 text-amber-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 4
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'easm' ? 'text-white' : 'text-zinc-300'}`}>
-              Postura EASM
-            </span>
-            <span className="text-[11px] text-zinc-400">Diffing & Score</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ai')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'ai'
-              ? 'bg-violet-950/40 border-violet-500/50 shadow-lg shadow-violet-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <FileCode className={`w-5 h-5 ${activeTab === 'ai' ? 'text-violet-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'ai' ? 'bg-violet-500/20 text-violet-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 5
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'ai' ? 'text-white' : 'text-zinc-300'}`}>
-              AI Copilot
-            </span>
-            <span className="text-[11px] text-zinc-400">Remediation</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('vps')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'vps'
-              ? 'bg-indigo-950/40 border-indigo-500/50 shadow-lg shadow-indigo-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <Terminal className={`w-5 h-5 ${activeTab === 'vps' ? 'text-indigo-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'vps' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 6
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'vps' ? 'text-white' : 'text-zinc-300'}`}>
-              Hardening VPS
-            </span>
-            <span className="text-[11px] text-zinc-400">UFW, SSH</span>
-          </div>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('playbook')}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-            activeTab === 'playbook'
-              ? 'bg-emerald-950/40 border-emerald-500/50 shadow-lg shadow-emerald-600/15'
-              : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-400'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <AlertOctagon className={`w-5 h-5 ${activeTab === 'playbook' ? 'text-emerald-400' : 'text-zinc-500'}`} />
-            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-              activeTab === 'playbook' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500'
-            }`}>
-              Cap. 7
-            </span>
-          </div>
-          <div className="mt-3">
-            <span className={`font-bold text-sm block ${activeTab === 'playbook' ? 'text-white' : 'text-zinc-300'}`}>
-              Playbook Clienti
-            </span>
-            <span className="text-[11px] text-emerald-400">Audit Live</span>
-          </div>
-        </button>
-      </div>
-
-      {/* Chapter Content in 2-Column Cards */}
-      <div className="space-y-4 pt-2">
+        {/* Contenuto capitolo a destra */}
+        <div className="md:col-span-3 space-y-4">
 
         {activeTab === 'external' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -836,6 +688,7 @@ sudo dpkg-reconfigure --priority=low unattended-upgrades`}
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

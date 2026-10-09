@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Public_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/Header";
 
-const inter = Inter({ subsets: ["latin"] });
+const sans = Public_Sans({ subsets: ["latin"], variable: "--font-sans", weight: ["400", "500", "600", "700"] });
+const mono = IBM_Plex_Mono({ subsets: ["latin"], variable: "--font-mono", weight: ["400", "500"] });
+
+// Preferenza di sola interfaccia: applicata prima del primo paint.
+const prefsBoot = `try{var t=localStorage.getItem('nd-theme')||'light',x=localStorage.getItem('nd-text');document.documentElement.dataset.theme=t;if(x==='large')document.documentElement.dataset.text='large'}catch(e){}`;
 
 export const metadata: Metadata = {
   title: "Network Diagnostic Tool",
@@ -16,9 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="it" className="dark">
-      <body className={`${inter.className} bg-zinc-950 text-zinc-200 min-h-screen`}>
-        <Header />
+    <html lang="it" data-theme="light" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: prefsBoot }} />
+      </head>
+      <body className="font-sans bg-background text-foreground min-h-screen">
         <main>{children}</main>
       </body>
     </html>

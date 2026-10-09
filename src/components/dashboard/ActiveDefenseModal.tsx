@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShieldAlert, Bell, Zap, X, Check, Lock, AlertTriangle, Send } from 'lucide-react';
+import { Shield, X } from 'lucide-react';
+import { StatusPill, Callout } from '@/components/ui/nd';
 
 interface ActiveDefenseModalProps {
   target: string;
@@ -42,14 +43,14 @@ export function ActiveDefenseModal({ target, isOpen, onClose }: ActiveDefenseMod
       });
       const data = await res.json();
       if (data.dispatchedToTelegram) {
-        setTestStatusMessage('✅ Alert inviato con successo sul canale Telegram!');
+        setTestStatusMessage('Avviso inviato con successo sul canale Telegram.');
       } else if (data.message) {
-        setTestStatusMessage(`ℹ️ ${data.message}`);
+        setTestStatusMessage(data.message);
       } else if (data.warning) {
-        setTestStatusMessage(`⚠️ ${data.warning}: ${data.telegramError || ''}`);
+        setTestStatusMessage(`${data.warning}: ${data.telegramError || ''}`);
       }
     } catch {
-      setTestStatusMessage('❌ Errore durante l’invio dell’allarme di prova.');
+      setTestStatusMessage('Errore durante l’invio dell’avviso di prova.');
     } finally {
       setIsSendingTest(false);
       setTimeout(() => setTestStatusMessage(null), 5000);
@@ -78,139 +79,156 @@ export function ActiveDefenseModal({ target, isOpen, onClose }: ActiveDefenseMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-[#0b101c] border border-[#1e2d45] rounded-lg max-w-xl w-full p-5 shadow-2xl space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#182338] pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded bg-[#450a0a] text-[#f87171] border border-[#b91c1c]">
-              <ShieldAlert className="w-5 h-5" />
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sentinel-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+    >
+      <div className="bg-surface border border-border rounded-lg max-w-xl w-full p-6 shadow-xl space-y-5">
+        {/* Intestazione */}
+        <div className="flex items-start justify-between border-b border-border pb-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-ink-muted" />
+              <h2 id="sentinel-title" className="text-base font-semibold text-ink">
+                Sentinel: Difesa attiva e avvisi
+              </h2>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white tracking-wide">
-                Sentinel: Active Defense & Alerting
-              </h3>
-              <p className="text-[11px] text-[#94a3b8]">
-                Protezione attiva perimetrale e notifiche incidenti per {target}
-              </p>
-            </div>
+            <p className="text-xs text-ink-muted">
+              Protezione perimetrale e notifiche incidenti per <span className="font-mono text-ink">{target}</span>
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="text-[#64748b] hover:text-white p-1 rounded transition-colors"
+            aria-label="Chiudi finestra"
+            className="text-ink-muted hover:text-ink p-1 rounded hover:bg-surface-alt transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Section 1: Panic Mode / Lockdown */}
-        <div className={`p-4 rounded border transition-all ${
-          panicModeActive
-            ? 'bg-[#450a0a]/30 border-[#b91c1c] shadow-[0_0_20px_rgba(239,68,68,0.2)]'
-            : 'bg-[#0f172a] border-[#1e293b]'
-        }`}>
+        {/* Blocco 1: Modalità emergenza / Lockdown */}
+        <div className="border border-border rounded-md p-4 bg-surface-alt space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-1.5">
-                <Zap className={`w-4 h-4 ${panicModeActive ? 'text-[#ef4444] animate-pulse' : 'text-[#f59e0b]'}`} />
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Panic Mode / Attacco in Corso
-                </h4>
+              <div className="text-xs uppercase tracking-wide font-medium text-ink-muted">
+                Modalità emergenza
               </div>
-              <p className="text-[11px] text-[#94a3b8] mt-1">
-                Forza la modalità "Under Attack" WAF e blocca le connessioni da IP esteri/anomali.
-              </p>
+              <h3 className="text-sm font-semibold text-ink mt-0.5">
+                Lockdown traffico WAF
+              </h3>
             </div>
+            <StatusPill tone={panicModeActive ? 'warn' : 'neutral'}>
+              {panicModeActive ? 'Attiva' : 'Non attiva'}
+            </StatusPill>
+          </div>
+
+          <Callout tone="warn">
+            La modalità di emergenza forza il controllo rigoroso sul WAF e può bloccare anche utenti legittimi.
+          </Callout>
+
+          <div className="text-xs text-ink-muted">
+            Richiede un WAF collegato. Stato: <span className="text-ink font-medium">Non rilevato</span> (da verificare sul pannello DNS/Hosting).
+          </div>
+
+          <div className="pt-1">
             <button
               onClick={togglePanicMode}
-              className={`px-3 py-1.5 rounded text-xs font-bold uppercase transition-all shrink-0 cursor-pointer ${
+              className={`px-3 py-2 text-xs font-medium rounded border transition-colors ${
                 panicModeActive
-                  ? 'bg-[#ef4444] text-white hover:bg-[#dc2626]'
-                  : 'bg-[#1e293b] text-[#fbbf24] border border-[#d97706] hover:bg-[#b45309] hover:text-white'
+                  ? 'border-border bg-surface text-ink hover:bg-surface-alt'
+                  : 'border-warn text-warn bg-transparent hover:bg-warn-bg'
               }`}
             >
-              {panicModeActive ? 'Disattiva Blocco' : 'Attiva Lockdown'}
+              {panicModeActive ? 'Disattiva lockdown' : 'Attiva lockdown'}
             </button>
           </div>
-          {panicModeActive && (
-            <div className="mt-3 p-2 bg-[#450a0a]/60 rounded text-[11px] text-[#fca5a5] flex items-center gap-2 border border-[#991b1b]">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>Protezione massima attiva: JavaScript challenge abilitato per tutti i visitatori.</span>
-            </div>
-          )}
         </div>
 
-        {/* Section 2: Alert Telegram */}
-        <div className="bg-[#0f172a] border border-[#1e293b] p-4 rounded space-y-3">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-[#00f0ff]" />
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-              Alert Istantanei Telegram (SOC / Sistemista)
-            </h4>
+        {/* Blocco 2: Avvisi su Telegram */}
+        <div className="border border-border rounded-md p-4 bg-surface space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-wide font-medium text-ink-muted">
+                Notifiche incidenti
+              </div>
+              <h3 className="text-sm font-semibold text-ink mt-0.5">
+                Avvisi su Telegram (SOC / Sistemista)
+              </h3>
+            </div>
+            <StatusPill tone={telegramChatId.trim() ? 'ok' : 'neutral'}>
+              {telegramChatId.trim() ? 'Configurato' : 'Non configurato'}
+            </StatusPill>
           </div>
-          <p className="text-[11px] text-[#94a3b8]">
-            Ricevi un messaggio su Telegram appena viene rilevato un picco di traffico anomalo, una porta aperta o un disservizio DNS.
+
+          <p className="text-xs text-ink-muted">
+            Ricevi una notifica istantanea in caso di anomalie DNS, degradazione TTFB o esposizione porte.
           </p>
 
-          <form onSubmit={handleSaveTelegram} className="space-y-2.5">
-            <div>
-              <label className="text-[10px] uppercase font-bold text-[#64748b] block mb-1">
-                Chat ID Telegram / Canale Alert
+          <form onSubmit={handleSaveTelegram} className="space-y-3 pt-1">
+            <div className="space-y-1">
+              <label htmlFor="sentinel-chat-id" className="text-xs font-medium text-ink block">
+                Chat ID o canale Telegram
               </label>
               <input
+                id="sentinel-chat-id"
                 type="text"
                 value={telegramChatId}
                 onChange={(e) => setTelegramChatId(e.target.value)}
                 placeholder="es. -100123456789"
-                className="w-full bg-[#070b14] border border-[#1e2d45] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#00f0ff]"
+                className="w-full h-9 px-3 text-xs bg-field border border-border rounded font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent"
               />
             </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-[#64748b] block mb-1">
-                Bot Token (Opzionale / Personalizzato)
+
+            <div className="space-y-1">
+              <label htmlFor="sentinel-token" className="text-xs font-medium text-ink block">
+                Token del bot (opzionale)
               </label>
               <input
+                id="sentinel-token"
                 type="password"
                 value={telegramToken}
                 onChange={(e) => setTelegramToken(e.target.value)}
-                placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                className="w-full bg-[#070b14] border border-[#1e2d45] rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#00f0ff]"
+                placeholder="••••••••••••••••••••••••"
+                className="w-full h-9 px-3 text-xs bg-field border border-border rounded font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-accent"
               />
+              <p className="text-[11px] text-ink-muted">
+                Viene salvato in modo cifrato e non sarà più mostrato in chiaro.
+              </p>
             </div>
 
             {testStatusMessage && (
-              <div className="p-2 rounded bg-[#070b14] border border-[#1e2d45] text-xs text-[#00f0ff] animate-in fade-in">
+              <Callout tone="neutral">
                 {testStatusMessage}
-              </div>
+              </Callout>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={sendTestAlert}
                 disabled={isSendingTest}
-                className="bg-[#1e293b] hover:bg-[#334155] text-[#38bdf8] text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-all cursor-pointer border border-[#0284c7]/40 disabled:opacity-50"
+                className="px-3 py-2 text-xs font-medium border border-border rounded text-ink bg-surface hover:bg-surface-alt disabled:opacity-50 transition-colors"
               >
-                <Bell className="w-3.5 h-3.5" />
-                <span>{isSendingTest ? 'Invio in corso...' : 'Invia Alert di Prova'}</span>
+                {isSendingTest ? 'Invio in corso...' : 'Invia avviso di prova'}
               </button>
 
               <button
                 type="submit"
-                className="bg-[#00f0ff] hover:bg-[#38bdf8] text-black text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,240,255,0.3)] ml-auto"
+                className="px-3 py-2 text-xs font-medium rounded bg-accent text-accent-ink hover:opacity-95 transition-opacity"
               >
-                {isSaved ? <Check className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
-                <span>{isSaved ? 'Configurazione Salvata!' : 'Salva Canale Alert'}</span>
+                {isSaved ? 'Configurazione salvata' : 'Salva canale'}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Footer */}
+        {/* Piede modale */}
         <div className="flex justify-end pt-1">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded bg-[#1e293b] hover:bg-[#334155] text-xs font-bold text-white transition-all cursor-pointer"
+            className="px-3 py-2 text-xs font-medium border border-border rounded text-ink bg-surface hover:bg-surface-alt transition-colors"
           >
             Chiudi
           </button>

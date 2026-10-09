@@ -1,13 +1,11 @@
 'use client';
 
 import { useInternalTests } from '@/hooks/useInternalTests';
-import { TestCard } from './TestCard';
 import { LanScanner } from './LanScanner';
 import { SpeedtestWidget } from './SpeedtestWidget';
 import { Button } from '@/components/ui/button';
-import { Play, Wifi, RefreshCw, Globe, Network, Zap, Activity, Radio } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { ExportButton } from '../ExportButton';
+import { RowList, ExpandableRow, StatusPill } from '@/components/ui/nd';
+import { ResultRenderer } from './ResultRenderer';
 
 export function InternalTests() {
   const { 
@@ -19,127 +17,136 @@ export function InternalTests() {
     runLatency, 
     runWifi, 
     runPacketLoss, 
-    runNetworkIntegrity,
-    runAll 
+    runNetworkIntegrity
   } = useInternalTests();
 
-  const activeCount = Object.values(loading).filter(Boolean).length;
-  const finishedCount = Object.values(results).filter(r => r !== null && r.status !== 'running').length;
-  const totalTests = 7;
-  const progress = (finishedCount / totalTests) * 100;
+  const getPill = (test: any, isLoading: boolean) => {
+    if (isLoading) return <StatusPill tone="pending">In corso</StatusPill>;
+    if (!test || test.status === 'idle') return <StatusPill tone="pending">In attesa</StatusPill>;
+    const s = String(test.status).toLowerCase();
+    if (['pass', 'success', 'ok'].includes(s)) return <StatusPill tone="ok">Superato</StatusPill>;
+    if (['warn', 'warning', 'attention'].includes(s)) return <StatusPill tone="warn">Attenzione</StatusPill>;
+    return <StatusPill tone="crit">Critico</StatusPill>;
+  };
 
   return (
     <div className="space-y-8">
-      {/* Header & Controls */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between pb-6 border-b border-zinc-800/80">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
-              <Wifi className="w-5 h-5" />
-            </div>
-            Internal Client Diagnostics & Speedtest
-          </h2>
-          <p className="text-sm text-zinc-400">
-            Diagnostica in tempo reale eseguita direttamente dal tuo browser verso la rete locale e i nodi edge.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <ExportButton externalResults={{}} internalResults={results} />
-          <Button 
-            onClick={() => runAll()} 
-            disabled={activeCount > 0}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold px-5 py-5 rounded-xl shadow-lg shadow-emerald-600/25 border border-emerald-400/20 transition-all min-w-[140px]"
-          >
-            {activeCount > 0 ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="mr-2 h-4 w-4 fill-current" />
-            )}
-            {activeCount > 0 ? 'Esecuzione...' : 'Esegui Tutti'}
-          </Button>
-        </div>
+      {/* Intestazione Sezione */}
+      <div className="border-b border-border pb-4">
+        <h1 className="text-[1.625rem] font-bold leading-tight text-foreground">
+          Rete interna e WiFi
+        </h1>
+        <p className="mt-1 text-[0.9375rem] text-ink-2">
+          Velocità, qualità della connessione e dispositivi presenti sulla rete locale.
+        </p>
       </div>
 
-      {/* Speedtest Live Gauge Widget */}
+      {/* Speedtest Widget */}
       <SpeedtestWidget />
 
-      {/* Progress Bar */}
-      {activeCount > 0 && (
-        <div className="space-y-2 p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 animate-in fade-in">
-          <div className="flex justify-between text-xs text-emerald-400 font-bold uppercase tracking-widest">
-            <span className="flex items-center gap-2">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              Esecuzione test client in corso...
-            </span>
-            <span>{Math.round(progress)}%</span>
-          </div>
-          <Progress value={progress} className="h-2 bg-zinc-900" />
-        </div>
-      )}
+      {/* 7 Test di Rete come righe */}
+      <div className="space-y-3">
+        <h2 className="text-[1.0625rem] font-bold text-foreground">
+          Test di rete <span className="text-xs font-normal text-ink-3">· 7 controlli</span>
+        </h2>
 
-      {/* Test Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <TestCard 
-          title="IP Pubblico & ISP"
-          description="Geolocalizzazione, ASN e dati provider"
-          icon={Globe}
-          test={results.public_ip}
-          loading={loading.public_ip}
-          onRun={runPublicIp}
-        />
-        <TestCard 
-          title="IP Locale (WebRTC)"
-          description="Indirizzo IP privato nella rete LAN locale"
-          icon={Network}
-          test={results.local_ip}
-          loading={loading.local_ip}
-          onRun={runLocalIp}
-        />
-        <TestCard 
-          title="Velocità Risoluzione DNS"
-          description="Tempo di fetch benchmark verso edge CDN"
-          icon={Zap}
-          test={results.dns_speed}
-          loading={loading.dns_speed}
-          onRun={runDnsSpeed}
-        />
-        <TestCard 
-          title="Latenza Cloudflare"
-          description="Ping HTTP verso Cloudflare 1.1.1.1"
-          icon={Activity}
-          test={results.latency}
-          loading={loading.latency}
-          onRun={runLatency}
-        />
-        <TestCard 
-          title="Qualità Connessione & RTT"
-          description="Stima banda downlink e latenza di rete"
-          icon={Wifi}
-          test={results.wifi}
-          loading={loading.wifi}
-          onRun={runWifi}
-        />
-        <TestCard 
-          title="Perdita Pacchetti (Burst)"
-          description="Stima perdita pacchetti su 10 richieste sequenziali"
-          icon={Radio}
-          test={results.packet_loss}
-          loading={loading.packet_loss}
-          onRun={runPacketLoss}
-        />
-        <TestCard 
-          title="Integrità DNS & Path MTU"
-          description="Verifica assenza di DNS Hijacking / Poisoning e stima MTU 1500 / MSS 1460"
-          icon={Network}
-          test={results.network_integrity}
-          loading={loading.network_integrity}
-          onRun={() => runNetworkIntegrity()}
-        />
+        <RowList>
+          <ExpandableRow
+            status={getPill(results.public_ip, loading.public_ip)}
+            title="IP pubblico e ISP"
+            summary="Geolocalizzazione, ASN e dati del provider."
+            action={
+              <Button variant="outline" size="sm" onClick={runPublicIp} disabled={loading.public_ip} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.public_ip && <ResultRenderer testId="public_ip" result={results.public_ip.result} />}
+          </ExpandableRow>
+
+          <ExpandableRow
+            status={getPill(results.local_ip, loading.local_ip)}
+            title="IP locale (WebRTC)"
+            summary="Indirizzo IP privato nella rete LAN."
+            action={
+              <Button variant="outline" size="sm" onClick={runLocalIp} disabled={loading.local_ip} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.local_ip && <ResultRenderer testId="local_ip" result={results.local_ip.result} />}
+          </ExpandableRow>
+
+          <ExpandableRow
+            status={getPill(results.dns_speed, loading.dns_speed)}
+            title="Velocità di risoluzione DNS"
+            summary="Tempo di fetch verso i nodi edge CDN."
+            action={
+              <Button variant="outline" size="sm" onClick={runDnsSpeed} disabled={loading.dns_speed} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.dns_speed && <ResultRenderer testId="dns_speed" result={results.dns_speed.result} />}
+          </ExpandableRow>
+
+          <ExpandableRow
+            status={getPill(results.latency, loading.latency)}
+            title="Latenza Cloudflare"
+            summary="Ping HTTP verso Cloudflare 1.1.1.1."
+            action={
+              <Button variant="outline" size="sm" onClick={runLatency} disabled={loading.latency} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.latency && <ResultRenderer testId="latency" result={results.latency.result} />}
+          </ExpandableRow>
+
+          <ExpandableRow
+            status={getPill(results.wifi, loading.wifi)}
+            title="Qualità connessione e RTT"
+            summary="Stima di banda in downlink e latenza di rete."
+            action={
+              <Button variant="outline" size="sm" onClick={runWifi} disabled={loading.wifi} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.wifi && <ResultRenderer testId="wifi" result={results.wifi.result} />}
+          </ExpandableRow>
+
+          <ExpandableRow
+            status={getPill(results.packet_loss, loading.packet_loss)}
+            title="Perdita pacchetti (burst)"
+            summary="Stima della perdita su 10 richieste sequenziali."
+            action={
+              <Button variant="outline" size="sm" onClick={runPacketLoss} disabled={loading.packet_loss} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.packet_loss && <ResultRenderer testId="packet_loss" result={results.packet_loss.result} />}
+          </ExpandableRow>
+
+          <ExpandableRow
+            status={getPill(results.network_integrity, loading.network_integrity)}
+            title="Integrità DNS e path MTU"
+            summary="Verifica assenza di DNS hijacking e stima MTU 1500 / MSS 1460."
+            action={
+              <Button variant="outline" size="sm" onClick={() => runNetworkIntegrity()} disabled={loading.network_integrity} className="text-xs">
+                Esegui
+              </Button>
+            }
+          >
+            {results.network_integrity && <ResultRenderer testId="network_integrity" result={results.network_integrity.result} />}
+          </ExpandableRow>
+        </RowList>
       </div>
 
-      {/* Embedded Live WiFi & LAN Subnet Scanner */}
-      <div className="pt-4 border-t border-zinc-800/80">
+      {/* Scansione rete locale */}
+      <div className="space-y-3 pt-2">
+        <h2 className="text-[1.0625rem] font-bold text-foreground">Scansione rete locale</h2>
         <LanScanner />
       </div>
     </div>
