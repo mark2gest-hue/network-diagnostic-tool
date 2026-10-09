@@ -15,6 +15,7 @@ import { BigScore, ActionCard, StatusPill, RowList, ExpandableRow, CommandBlock 
 interface ExecutiveRemediationSummaryProps {
   target: string;
   perspectiveMode?: 'executive' | 'it-pro';
+  onOpenExportModal?: () => void;
 }
 
 interface RemediationItem {
@@ -31,7 +32,11 @@ interface RemediationItem {
   nistCsf?: string;
 }
 
-export function ExecutiveRemediationSummary({ target, perspectiveMode = 'executive' }: ExecutiveRemediationSummaryProps) {
+export function ExecutiveRemediationSummary({ 
+  target, 
+  perspectiveMode = 'executive',
+  onOpenExportModal 
+}: ExecutiveRemediationSummaryProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
 
@@ -306,11 +311,11 @@ export function ExecutiveRemediationSummary({ target, perspectiveMode = 'executi
 
           <Button
             variant="default"
-            onClick={downloadExecutivePdf}
+            onClick={onOpenExportModal ? onOpenExportModal : downloadExecutivePdf}
             className="text-xs"
           >
             <Download className="size-4 mr-2" aria-hidden="true" />
-            Scarica PDF per il cliente
+            Scarica PDF completo
           </Button>
         </div>
       </div>

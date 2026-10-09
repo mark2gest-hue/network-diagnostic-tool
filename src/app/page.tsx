@@ -5,6 +5,7 @@ import { useExternalTests } from '@/hooks/useExternalTests';
 import { useInternalTests } from '@/hooks/useInternalTests';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 import { useVulnerabilityScan } from '@/hooks/useVulnerabilityScan';
+import { usePentestSuite } from '@/hooks/usePentestSuite';
 import { ResultRenderer } from '@/components/dashboard/ResultRenderer';
 import { ExportReportModal } from '@/components/dashboard/ExportReportModal';
 import { InternalTests } from '@/components/dashboard/InternalTests';
@@ -168,6 +169,7 @@ export default function Dashboard() {
   const internalSuite = useInternalTests();
   const securitySuite = useSecurityAudit();
   const vulnerabilitySuite = useVulnerabilityScan();
+  const pentestSuite = usePentestSuite();
 
   const activeCount = Object.values(loading).filter(Boolean).length;
   const finishedCount = Object.values(results).filter(
@@ -338,7 +340,11 @@ export default function Dashboard() {
         {/* TAB 0: EXECUTIVE SUMMARY & REMEDIATION PLAN */}
         {/* ========================================================================= */}
         {activeSection === 'remediation' && (
-          <ExecutiveRemediationSummary target={target} perspectiveMode={perspectiveMode} />
+          <ExecutiveRemediationSummary 
+            target={target} 
+            perspectiveMode={perspectiveMode} 
+            onOpenExportModal={() => setReportModalOpen(true)}
+          />
         )}
 
         {/* ========================================================================= */}
@@ -629,7 +635,11 @@ export default function Dashboard() {
         {/* TAB 5: PENETRATION TESTING & EXPLOIT PROBE */}
         {/* ========================================================================= */}
         {activeSection === 'pentest' && (
-          <PentestSection target={target} />
+          <PentestSection 
+            target={target} 
+            pentestSuite={pentestSuite}
+            onOpenExportModal={() => setReportModalOpen(true)}
+          />
         )}
 
         {/* ========================================================================= */}
@@ -652,6 +662,7 @@ export default function Dashboard() {
         internalResults={internalSuite.results}
         securityResults={securitySuite.results}
         vulnerabilityResults={vulnerabilitySuite.results}
+        pentestResults={pentestSuite.data}
       />
     </div>
   );
