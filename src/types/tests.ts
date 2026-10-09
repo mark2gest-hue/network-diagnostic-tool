@@ -1,4 +1,4 @@
-export type TestStatus = 'idle' | 'running' | 'pass' | 'warning' | 'fail';
+export type TestStatus = 'idle' | 'running' | 'pass' | 'warning' | 'fail' | 'error';
 
 export interface TestResult {
   id: string;

@@ -12,6 +12,7 @@ import { SecurityAudit } from '@/components/dashboard/SecurityAudit';
 import { VulnerabilityScan } from '@/components/dashboard/VulnerabilityScan';
 import { ManualSection } from '@/components/dashboard/ManualSection';
 import { ExecutiveRemediationSummary } from '@/components/dashboard/ExecutiveRemediationSummary';
+import { PentestSection } from '@/components/dashboard/PentestSection';
 import { ActiveDefenseModal } from '@/components/dashboard/ActiveDefenseModal';
 import { SubdomainHunterCard } from '@/components/dashboard/SubdomainHunterCard';
 import {
@@ -39,6 +40,7 @@ import {
   BookOpen,
   BarChart3,
   ShieldHalf,
+  Crosshair,
 } from 'lucide-react';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
@@ -54,7 +56,7 @@ import {
 import { useUiPrefs, UiTheme } from '@/hooks/useUiPrefs';
 import { TestResult, ExternalTestType } from '@/types/tests';
 
-type MainSectionTab = 'remediation' | 'external' | 'internal' | 'security' | 'vulnerabilities' | 'manual';
+type MainSectionTab = 'remediation' | 'external' | 'internal' | 'security' | 'vulnerabilities' | 'pentest' | 'manual';
 
 interface TestModuleDefinition {
   type: ExternalTestType;
@@ -190,6 +192,7 @@ export default function Dashboard() {
     { id: 'internal', label: 'Rete interna e WiFi', sublabel: 'Client Speedtest, ARP Subnet Sweep', icon: Wifi, badge: 'CLIENT & LAN' },
     { id: 'security', label: 'Audit di sicurezza', sublabel: 'SPF, DKIM, DMARC, Blacklist & Threat Radar', icon: ShieldCheck, badge: 'SCORE 0-100' },
     { id: 'vulnerabilities', label: 'Vulnerabilità', sublabel: 'File Esposti, CORS, Clickjacking & CVE', icon: Flame, badge: 'EXPLOIT RADAR' },
+    { id: 'pentest', label: 'Penetration test', sublabel: 'Verifica Empirica Attiva OWASP & Takeover', icon: Crosshair, badge: 'ATTIVO' },
     { id: 'manual', label: 'Manuale operativo', sublabel: 'Playbook Sistemistico & Conformità NIS2', icon: BookOpen, badge: 'DOCS & PDF' },
   ];
   const ui = useUiPrefs();
@@ -206,9 +209,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background text-foreground lg:flex">
       {/* Sidebar: un solo livello, sezioni sempre visibili */}
       <aside className="border-b border-border bg-surface lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-[232px] lg:flex-col lg:overflow-y-auto lg:border-b-0 lg:border-r">
-        <div className="px-5 pb-2 pt-5">
-          <div className="text-[1.0625rem] font-bold leading-tight">NetworkDiag</div>
-          <div className="text-[0.8125rem] text-ink-3">by aiutiamoci</div>
+        <div className="px-5 pb-2 pt-5 flex items-center justify-between">
+          <div>
+            <div className="text-[1.0625rem] font-bold leading-tight">NetworkDiag</div>
+            <div className="text-[0.8125rem] text-ink-3">by aiutiamoci</div>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full bg-ok-bg px-2 py-0.5 text-[0.75rem] font-medium text-ok" title="Engine diagnostico attivo e verificato">
+            <span className="size-1.5 rounded-full bg-ok animate-pulse" aria-hidden="true" />
+            <span>Online</span>
+          </div>
         </div>
 
         <nav aria-label="Sezioni" className="flex flex-wrap gap-1 px-3 py-2 lg:flex-col lg:flex-nowrap">
@@ -610,7 +619,14 @@ export default function Dashboard() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 5: MANUALE & GUIDA */}
+        {/* TAB 5: PENETRATION TESTING & EXPLOIT PROBE */}
+        {/* ========================================================================= */}
+        {activeSection === 'pentest' && (
+          <PentestSection target={target} />
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 6: MANUALE & GUIDA */}
         {/* ========================================================================= */}
         {activeSection === 'manual' && (
           <div className="bg-[#090d16] border border-[#1c2940] rounded-md p-4">

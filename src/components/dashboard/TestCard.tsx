@@ -49,6 +49,12 @@ const statusConfig: Record<TestStatus, { label: string; badgeClass: string; icon
     icon: XCircle,
     glowClass: 'hover:border-red-500/40'
   },
+  error: { 
+    label: 'Errore Connessione', 
+    badgeClass: 'bg-zinc-800/80 text-zinc-300 border-zinc-700/50', 
+    icon: AlertTriangle,
+    glowClass: 'hover:border-zinc-500/40'
+  },
 };
 
 export function TestCard({ test, loading, onRun, title, description, icon: CustomIcon }: TestCardProps) {
