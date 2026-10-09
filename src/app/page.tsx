@@ -612,7 +612,7 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {activeSection === 'security' && (
           <div className="bg-[#090d16] border border-[#1c2940] rounded-md p-4">
-            <SecurityAudit />
+            <SecurityAudit target={target} />
           </div>
         )}
 
@@ -621,7 +621,7 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {activeSection === 'vulnerabilities' && (
           <div className="bg-[#090d16] border border-[#1c2940] rounded-md p-4">
-            <VulnerabilityScan />
+            <VulnerabilityScan target={target} />
           </div>
         )}
 

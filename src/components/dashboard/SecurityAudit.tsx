@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,19 @@ import {
 import { RowList, ExpandableRow, StatusPill, BigScore } from '@/components/ui/nd';
 import { ResultRenderer } from './ResultRenderer';
 
-export function SecurityAudit() {
-  const [target, setTarget] = useState('aiutiamoci.cloud');
+interface SecurityAuditProps {
+  target?: string;
+}
+
+export function SecurityAudit({ target: initialTarget = 'aiutiamoci.cloud' }: SecurityAuditProps) {
+  const [target, setTarget] = useState(initialTarget);
   const { results, loading, overallScore, runAll, generatePDF } = useSecurityAudit();
+
+  React.useEffect(() => {
+    if (initialTarget) {
+      setTarget(initialTarget);
+    }
+  }, [initialTarget]);
   
   const isRunning = Object.values(loading).some(l => l);
 
