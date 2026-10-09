@@ -203,7 +203,7 @@ export default function Dashboard() {
     `flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.875rem] font-medium transition-colors ${
       active ? 'bg-accent-bg text-accent font-semibold' : 'text-ink-2 hover:bg-hover hover:text-foreground'
     }`;
-  const showDomainBar = activeSection === 'remediation' || activeSection === 'external';
+  const showDomainBar = activeSection === 'remediation' || activeSection === 'external' || activeSection === 'pentest' || activeSection === 'security' || activeSection === 'vulnerabilities';
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:flex">
@@ -306,7 +306,7 @@ export default function Dashboard() {
               spellCheck={false}
               className="min-h-11 w-full max-w-xs flex-1 rounded-md border border-field-border bg-field px-3 font-mono text-[0.875rem] text-foreground outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             />
-            {activeSection === 'external' && (
+            {activeSection === 'external' ? (
               <button
                 type="submit"
                 disabled={activeCount > 0}
@@ -314,6 +314,13 @@ export default function Dashboard() {
               >
                 {activeCount > 0 && <RefreshCw className="size-4 animate-spin" aria-hidden="true" />}
                 {activeCount > 0 ? `In esecuzione (${activeCount})…` : `Esegui tutti (${totalTests})`}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-surface px-4 text-[0.875rem] font-semibold text-foreground hover:bg-surface-alt"
+              >
+                Imposta dominio
               </button>
             )}
           </form>
