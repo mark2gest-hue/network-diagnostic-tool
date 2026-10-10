@@ -1,0 +1,142 @@
+{
+  "version": "1.0",
+  "project": "Diagnostic Tool",
+  "lastUpdated": "2026-10-10T15:55:00Z",
+  "nodes": [
+    {
+      "id": "area-scanner",
+      "type": "areaNode",
+      "position": { "x": 40, "y": 140 },
+      "data": {
+        "label": "Network Discovery & ARP Engine",
+        "code": "NET-01",
+        "category": "area",
+        "description": "Scansione subnet locale (192.168.x.x / 10.x.x.x) con ARP ping, rilevamento MAC address e vendor OUI.",
+        "status": "done",
+        "states": ["InterfaceList", "SubnetTarget", "ActiveHosts"],
+        "actions": ["ScanSubnet", "ResolveHostnames", "DetectGateways"],
+        "filePath": "/Users/marco/Sviluppo/Progetti/Progetto network-diagnostic-tool/src/scanner.ts",
+        "agentTaskPrompt": "Verifica l'accuratezza del parser ARP in src/scanner.ts."
+      }
+    },
+    {
+      "id": "agg-ports",
+      "type": "aggregateNode",
+      "position": { "x": 380, "y": 50 },
+      "data": {
+        "label": "TCP Port & Service Audit",
+        "code": "AGG-PORT",
+        "category": "aggregate",
+        "description": "Scansione rapida porte top-100 (SSH 22, HTTP 80, HTTPS 443, RDP 3389, RTSP telecamere).",
+        "status": "done",
+        "rules": [
+          "INV-1: Timeout socket per porta clampato a 400ms",
+          "INV-2: Concorrenza max 50 socket contemporanei (anti-crash router)",
+          "INV-3: Rilevamento banner di servizio non invasivo"
+        ],
+        "states": ["PortQueued", "Scanning", "OpenPortsIdentified"],
+        "filePath": "/Users/marco/Sviluppo/Progetti/Progetto network-diagnostic-tool/src/portScanner.ts",
+        "agentTaskPrompt": "Ottimizza il pooling dei socket TCP in src/portScanner.ts."
+      }
+    },
+    {
+      "id": "agg-latency",
+      "type": "aggregateNode",
+      "position": { "x": 380, "y": 320 },
+      "data": {
+        "label": "Latency & Jitter Sentinel",
+        "code": "AGG-PING",
+        "category": "aggregate",
+        "description": "Monitoraggio ICMP verso gateway, DNS 1.1.1.1 e 8.8.8.8 per rilevare packet loss e instabilità Wi-Fi.",
+        "status": "done",
+        "rules": [
+          "INV-1: Campionamento minimo 10 ping per calcolo jitter",
+          "INV-2: Alert immediato se packet loss > 3%",
+          "INV-3: Rilevamento hop intermedi Traceroute"
+        ],
+        "states": ["Monitoring", "Stable", "DegradedAlert"],
+        "filePath": "/Users/marco/Sviluppo/Progetti/Progetto network-diagnostic-tool/src/pingMonitor.ts",
+        "agentTaskPrompt": "Aggiorna la formula di calcolo del Jitter RFC 3550 in src/pingMonitor.ts."
+      }
+    },
+    {
+      "id": "agg-report",
+      "type": "aggregateNode",
+      "position": { "x": 740, "y": 140 },
+      "data": {
+        "label": "Executive PDF & Security Report",
+        "code": "AGG-REP",
+        "category": "aggregate",
+        "description": "Generatore di report PDF d'impatto con punteggio di sicurezza della rete aziendale per il cliente.",
+        "status": "done",
+        "rules": [
+          "INV-1: Layout A4 pronto per la stampa",
+          "INV-2: Evidenziazione vulnerabilità critiche (es. porte Telnet/RDP aperte)",
+          "INV-3: Auto-vaulting immediato in Obsidian"
+        ],
+        "states": ["Compiling", "PdfRendered"],
+        "filePath": "/Users/marco/Sviluppo/Progetti/Progetto network-diagnostic-tool/src/pdfGenerator.ts",
+        "agentTaskPrompt": "Verifica il rendering del punteggio di sicurezza nel PDF generato."
+      }
+    },
+    {
+      "id": "evt-audit-done",
+      "type": "eventNode",
+      "position": { "x": 1080, "y": 140 },
+      "data": {
+        "label": "NetworkAuditCompleted",
+        "code": "EVT-NET",
+        "category": "event",
+        "description": "Scansione terminata: genera la scheda diagnostica e salva il deliverable nel Secondo Cervello.",
+        "status": "done",
+        "filePath": "/Users/marco/Sviluppo/Progetti/Progetto network-diagnostic-tool/src/index.ts",
+        "agentTaskPrompt": "Verifica l'export automatico del file di report al termine del ciclo."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-net-port",
+      "source": "area-scanner",
+      "target": "agg-ports",
+      "animated": true,
+      "label": "discovers hosts",
+      "style": { "stroke": "#38bdf8", "strokeWidth": 2 },
+      "markerEnd": { "type": "arrowclosed", "color": "#38bdf8" }
+    },
+    {
+      "id": "e-net-ping",
+      "source": "area-scanner",
+      "target": "agg-latency",
+      "label": "targets gateway",
+      "style": { "stroke": "#38bdf8", "strokeWidth": 2 },
+      "markerEnd": { "type": "arrowclosed", "color": "#38bdf8" }
+    },
+    {
+      "id": "e-ports-rep",
+      "source": "agg-ports",
+      "target": "agg-report",
+      "animated": true,
+      "label": "feeds vulnerabilities",
+      "style": { "stroke": "#fbbf24", "strokeWidth": 2 },
+      "markerEnd": { "type": "arrowclosed", "color": "#fbbf24" }
+    },
+    {
+      "id": "e-ping-rep",
+      "source": "agg-latency",
+      "target": "agg-report",
+      "label": "feeds stability score",
+      "style": { "stroke": "#fbbf24", "strokeWidth": 2 },
+      "markerEnd": { "type": "arrowclosed", "color": "#fbbf24" }
+    },
+    {
+      "id": "e-rep-evt",
+      "source": "agg-report",
+      "target": "evt-audit-done",
+      "animated": true,
+      "label": "delivers report",
+      "style": { "stroke": "#fb7185", "strokeWidth": 2 },
+      "markerEnd": { "type": "arrowclosed", "color": "#fb7185" }
+    }
+  ]
+}
