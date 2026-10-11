@@ -119,62 +119,95 @@ export function ExportReportModal({
       doc.text('Stato Analisi: Report diagnostico approfondito generato da engine di rete.', 18, 68);
     }
 
-    // 3. Costruzione righe tabella diagnostica
-    const tableRows = Object.entries(results).map(([key, rawItem]) => {
+    // 3. Calcolo metrica di copertura preliminare
+    const allModulesList = Object.entries(results);
+    const totalCount = allModulesList.length;
+    const completedCount = allModulesList.filter(([, v]) => {
+      const s = String(v?.status || '').toLowerCase();
+      return s === 'success' || s === 'pass' || s === 'passed' || s === 'ok';
+    }).length;
+    const coveragePct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Copertura Esecutiva Moduli: ${coveragePct}% (${completedCount}/${totalCount} moduli completati con successo)`, 18, 72);
+
+    // 4. Costruzione righe tabella diagnostica senza mockup
+    const tableRows = allModulesList.map(([key, rawItem]) => {
       const item = rawItem as any;
       const title = testNameMap[key] || key.toUpperCase();
       if (!item) {
         return [title, 'NON ESEGUITO', 'Modulo non incluso nella sessione'];
       }
 
-      const rawStatus = String(item.status || '').toLowerCase();
-      const status = (rawStatus === 'success' || rawStatus === 'pass' || rawStatus === 'passed' || rawStatus === 'propagated' || rawStatus === 'ok')
-        ? 'OTTIMALE' 
-        : (rawStatus === 'warning' || rawStatus === 'warn' || rawStatus === 'attention')
-        ? 'ATTENZIONE' 
-        : (rawStatus === 'error' || rawStatus === 'fail' || rawStatus === 'failed')
-        ? 'CRITICO' 
-        : 'IN CORSO';
+      const rawStatus = String(item.status || item.executionStatus || '').toLowerCase();
+      const outcome = String(item.securityOutcome || '').toLowerCase();
+
+      let status = 'INFORMATIVO';
+      if (rawStatus === 'success' || rawStatus === 'pass' || rawStatus === 'passed' || rawStatus === 'propagated' || rawStatus === 'ok') {
+        status = 'OTTIMALE';
+      } else if (rawStatus === 'warning' || rawStatus === 'warn' || rawStatus === 'attention') {
+        status = 'ATTENZIONE';
+      } else if (rawStatus === 'error' || rawStatus === 'fail' || rawStatus === 'failed') {
+        status = (outcome === 'inconclusive' || outcome === 'not_applicable') ? 'INCONCLUSIVO' : 'CRITICO';
+      } else if (rawStatus === 'inconclusive' || outcome === 'inconclusive') {
+        status = 'INCONCLUSIVO';
+      } else if (rawStatus === 'skipped' || outcome === 'not_applicable') {
+        status = 'NON APPLICABILE';
+      }
 
       const payload = item.result ?? item.data;
       let summaryDetail = '-';
       if (payload) {
         if (typeof payload === 'string') {
-          summaryDetail = payload.slice(0, 75);
+          summaryDetail = payload;
         } else if (payload.message) {
-          summaryDetail = String(payload.message).slice(0, 75);
-        } else if ((key === 'dns' || key === 'propagation') && (payload.records || payload.A || payload.answers)) {
-          const aRecs = payload.records?.A || payload.A || payload.answers || [];
-          summaryDetail = `A: ${Array.isArray(aRecs) ? aRecs.join(', ') : String(aRecs)}`.slice(0, 75);
+          summaryDetail = String(payload.message);
+        } else if ((key === 'dns' || key === 'propagation') && (payload.a || payload.records || payload.A || payload.answers || payload.mx)) {
+          const aRecs = payload.a || payload.records?.A || payload.A || payload.answers || [];
+          const aStr = Array.isArray(aRecs) && aRecs.length > 0 ? `IPv4: ${aRecs.join(', ')}` : '';
+          const mxRecs = payload.mx || [];
+          const mxStr = Array.isArray(mxRecs) && mxRecs.length > 0 
+            ? `MX: ${mxRecs.map((m: any) => typeof m === 'object' ? `${m.exchange} (${m.priority})` : String(m)).slice(0, 2).join(', ')}` 
+            : '';
+          summaryDetail = [aStr, mxStr].filter(Boolean).join(' | ') || 'Record DNS acquisiti ed esaminati.';
         } else if (key === 'ttfb' && (payload.timings || payload.ttfb)) {
           const t = payload.timings || payload;
-          summaryDetail = `TTFB: ${t.ttfb ?? t.dns ?? '-'}ms | Totale: ${t.total ?? '-'}ms`;
-        } else if (key === 'ssl' && (payload.validTo || payload.daysRemaining !== undefined)) {
-          summaryDetail = `Issuer: ${payload.issuer || 'N/A'} | Giorni residui: ${payload.daysRemaining ?? 'N/A'}`;
-        } else if ((key === 'portScan' || key === 'portscan') && (payload.openPorts || payload.open_ports)) {
-          const ports = payload.openPorts || payload.open_ports || [];
-          summaryDetail = `Porte Aperte: ${ports.length > 0 ? ports.join(', ') : 'Nessuna porta standard aperta'}`;
-        } else if (key === 'rbl' && (payload.blacklists || payload.listings !== undefined)) {
-          summaryDetail = `Blacklist: ${payload.listedCount ?? payload.listings ?? 0} riscontri su database RBL`;
+          summaryDetail = `TTFB: ${t.ttfb ?? t.dns ?? '-'}ms | Latenza totale: ${t.total ?? '-'}ms`;
+        } else if (key === 'ssl' && (payload.validTo || payload.daysRemaining !== undefined || payload.days_remaining !== undefined)) {
+          const days = payload.days_remaining ?? payload.daysRemaining ?? 'N/A';
+          summaryDetail = `Certificato SSL/TLS valido (${days} giorni residui - Issuer: ${payload.issuer || 'Let\'s Encrypt / CA'})`;
+        } else if ((key === 'portScan' || key === 'portscan') && (payload.ports || payload.openPorts || payload.open_ports)) {
+          const portItems = payload.ports || [];
+          const openList = Array.isArray(portItems)
+            ? portItems.filter((p: any) => p.open || p.status === 'open').map((p: any) => p.port)
+            : (payload.openPorts || payload.open_ports || []);
+          summaryDetail = openList.length > 0 
+            ? `Porte aperte rilevate: ${openList.join(', ')}` 
+            : 'Nessuna porta standard aperta';
+        } else if (key === 'rbl' && (payload.listedIn || payload.blacklists)) {
+          const count = payload.listedIn ? payload.listedIn.length : (payload.listedCount ?? 0);
+          summaryDetail = count > 0 ? `Segnalato in ${count} database RBL: ${payload.listedIn.join(', ')}` : 'Nessuna presenza in blacklist RBL';
         } else if (key === 'whois' && (payload.registrar || payload.creationDate)) {
           summaryDetail = `Registrar: ${payload.registrar || 'Rilevato'} | Scadenza: ${payload.expirationDate || 'N/A'}`;
-        } else if (key === 'ping' && (payload.avg || payload.time)) {
-          summaryDetail = `Latenza media: ${payload.avg || payload.time}ms`;
+        } else if (key === 'ping' && (payload.latency !== undefined || payload.avg !== undefined || payload.time !== undefined)) {
+          const lat = payload.latency ?? payload.avg ?? payload.time;
+          summaryDetail = `Latenza TCP (${payload.method || 'Connect'}): ${lat}ms`;
         } else if (payload.status) {
           summaryDetail = `Status code: ${payload.status} | Protocollo: ${payload.protocol || 'HTTPS'}`;
         } else {
-          summaryDetail = 'Dati telemetrici acquisiti con successo';
+          summaryDetail = 'Dati acquisiti ed esaminati.';
         }
       } else if (item.error) {
-        summaryDetail = `Errore: ${String(item.error).slice(0, 70)}`;
+        summaryDetail = `Errore di esecuzione: ${String(item.error)}`;
       }
 
       return [title, status, summaryDetail];
     });
 
-    // 4. Inserimento tabella tramite autotable
+    // 5. Inserimento tabella tramite autotable con righe espandibili (no testo troncato)
     autoTable(doc, {
-      startY: 80,
+      startY: 78,
       head: [['Modulo Diagnostico', 'Esito', 'Dettagli / Evidenze Tecniche']],
       body: tableRows,
       theme: 'grid',
@@ -182,31 +215,35 @@ export function ExportReportModal({
         fillColor: [30, 41, 59],
         textColor: [255, 255, 255],
         fontStyle: 'bold',
-        fontSize: 9
+        fontSize: 8.5
       },
       columnStyles: {
-        0: { cellWidth: 55, fontStyle: 'bold' },
-        1: { cellWidth: 32, halign: 'center' },
+        0: { cellWidth: 50, fontStyle: 'bold' },
+        1: { cellWidth: 30, halign: 'center' },
         2: { cellWidth: 'auto' }
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 1) {
           const val = String(data.cell.raw);
           if (val === 'OTTIMALE') {
-            data.cell.styles.textColor = [16, 185, 129]; // emerald
+            data.cell.styles.textColor = [16, 185, 129];
             data.cell.styles.fontStyle = 'bold';
-          } else if (val === 'ATTENZIONE') {
-            data.cell.styles.textColor = [245, 158, 11]; // amber
+          } else if (val === 'ATTENZIONE' || val === 'INCONCLUSIVO') {
+            data.cell.styles.textColor = [245, 158, 11];
             data.cell.styles.fontStyle = 'bold';
           } else if (val === 'CRITICO') {
-            data.cell.styles.textColor = [239, 68, 68]; // rose
+            data.cell.styles.textColor = [239, 68, 68];
             data.cell.styles.fontStyle = 'bold';
+          } else if (val === 'NON APPLICABILE' || val === 'NON ESEGUITO') {
+            data.cell.styles.textColor = [148, 163, 184];
+            data.cell.styles.fontStyle = 'normal';
           }
         }
       },
       styles: {
-        fontSize: 8,
-        cellPadding: 3
+        fontSize: 7.5,
+        cellPadding: 2.5,
+        overflow: 'linebreak'
       }
     });
 
@@ -223,18 +260,17 @@ export function ExportReportModal({
     doc.setFont('helvetica', 'normal');
     doc.text(`Telemetria Client, Sottorete Locale ARP ed Email Authentication | Target: ${target}`, 14, 23);
 
-    // Tabella 2.A: Diagnostica Interna
+    // Tabella 2.A: Diagnostica Interna (solo se autorizzata ed eseguita sul campo)
     const safeInternal = internalResults || {};
-    const internalRows: string[][] = Object.entries(safeInternal).length > 0
-      ? Object.entries(safeInternal).map(([k, v]) => {
-          const s = v?.status === 'pass' ? 'SUPERATO' : v?.status === 'warning' ? 'ATTENZIONE' : v ? 'RILEVATO' : 'NON ESEGUITO';
-          const det = v?.result ? (typeof v.result === 'object' ? JSON.stringify(v.result).slice(0, 80) : String(v.result)) : (v?.error || '-');
+    const executedInternal = Object.entries(safeInternal).filter(([, v]) => v && v.status && v.status !== 'idle');
+    const internalRows: string[][] = executedInternal.length > 0
+      ? executedInternal.map(([k, v]) => {
+          const s = v?.status === 'pass' ? 'SUPERATO' : v?.status === 'warning' ? 'ATTENZIONE' : v?.status === 'fail' ? 'CRITICO' : v ? 'RILEVATO' : 'NON ESEGUITO';
+          const det = v?.result ? (typeof v.result === 'object' ? JSON.stringify(v.result) : String(v.result)) : (v?.error || '-');
           return [k.replace(/_/g, ' ').toUpperCase(), s, det];
         })
       : [
-          ['INTERFACCIA HOST EN0', 'RILEVATO', 'IP Locale e subnet attiva del computer analizzatore'],
-          ['ROUTER / GATEWAY WIFI', 'SUPERATO', 'Gateway 192.168.1.1 raggiungibile con latenza < 2ms'],
-          ['DNS LEAK & SPEED', 'SUPERATO', 'Nessuna perdita DNS verso resolver non autorizzati'],
+          ['Audit Perimetrale Esterno', 'NON APPLICABILE', 'Sessione diagnostica perimetrale esterna. I controlli LAN/WiFi/ARP richiedono operatore fisicamente presente nella subnet locale del cliente.']
         ];
 
     autoTable(doc, {
@@ -258,30 +294,38 @@ export function ExportReportModal({
     const safeSec = securityResults || {};
     const secRows: string[][] = Object.entries(safeSec).length > 0
       ? Object.entries(safeSec).map(([k, v]) => {
-          const s = v?.status === 'pass' ? 'CONFORME' : v?.status === 'warning' ? 'ATTENZIONE' : v?.status === 'fail' ? 'CRITICO' : 'VERIFICATO';
-          let det = 'Record verificato';
-          if (k === 'leaks') {
-            const comb = v?.result?.combCount || 0;
-            const breaches = v?.result?.breachesCount || 0;
-            det = `${comb} credenziali COMB esposte, ${breaches} data breach storici rilevati`;
-          } else if (k === 'emailArmor') {
-            const sts = v?.result?.mtaSts?.present ? 'MTA-STS: Presente' : 'MTA-STS: Assente';
-            const bimi = v?.result?.bimi?.present ? 'BIMI: Presente' : 'BIMI: Assente';
-            det = `${sts} | ${bimi}`;
-          } else if (v?.result && typeof v.result === 'object') {
-            if ('detail' in (v.result as Record<string, unknown>)) {
-              det = String((v.result as Record<string, unknown>).detail).slice(0, 90);
-            } else if ('summary' in (v.result as Record<string, unknown>)) {
-              det = String((v.result as Record<string, unknown>).summary).slice(0, 90);
+          const rawStatus = String(v?.status || '').toLowerCase();
+          const s = rawStatus === 'pass' || rawStatus === 'ok' ? 'CONFORME' : rawStatus === 'warning' || rawStatus === 'warn' ? 'ATTENZIONE' : rawStatus === 'fail' ? 'CRITICO' : 'VERIFICATO';
+          let det = '-';
+          const res = v?.result as Record<string, unknown> | undefined;
+          if (res && typeof res === 'object') {
+            if (res.multipleRecordsFound) {
+              det = `Rilevati ${Array.isArray(res.records) ? res.records.length : 2} record duplicati in DNS (Violazione RFC)`;
+            } else if (res.message) {
+              det = String(res.message);
+              if (res.policy) det += ` (Policy: ${res.policy})`;
+            } else if (res.detail) {
+              det = String(res.detail);
+            } else if (res.summary) {
+              det = String(res.summary);
+            } else if (k === 'leaks') {
+              const comb = res.combCount || 0;
+              const breaches = res.breachesCount || 0;
+              det = `${comb} credenziali COMB esposte, ${breaches} data breach storici rilevati`;
+            } else if (k === 'emailArmor') {
+              const sts = (res.mtaSts as { present?: boolean })?.present ? 'MTA-STS: Presente' : 'MTA-STS: Assente';
+              const bimi = (res.bimi as { present?: boolean })?.present ? 'BIMI: Presente' : 'BIMI: Assente';
+              det = `${sts} | ${bimi}`;
             }
+          } else if (v?.message) {
+            det = String(v.message);
+          } else if (v?.error) {
+            det = `Errore verifica: ${v.error}`;
           }
           return [k.replace(/([A-Z])/g, ' $1').toUpperCase(), s, det];
         })
       : [
-          ['SPF RECORD', 'CONFORME', 'Record autoritativo attivo con validazione mittenti'],
-          ['DMARC POLICY', 'ATTENZIONE', 'Policy impostata su p=none (monitoraggio) - Consigliato p=quarantine'],
-          ['DKIM FIRMA', 'VERIFICATO', 'Selettori principali convalidati'],
-          ['DNSSEC', 'CONFORME', 'Firma di sicurezza crittografica DNS attiva'],
+          ['Postura Email & DNSSEC', 'NON ESEGUITO', 'Modulo di verifica SPF/DKIM/DMARC non incluso nella sessione corrente.']
         ];
 
     autoTable(doc, {
@@ -291,7 +335,7 @@ export function ExportReportModal({
       theme: 'grid',
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' }, 1: { cellWidth: 30, halign: 'center' }, 2: { cellWidth: 'auto' } },
-      styles: { fontSize: 7.5, cellPadding: 2 }
+      styles: { fontSize: 7.5, cellPadding: 2.5, overflow: 'linebreak' }
     });
 
     // 6. Pagina 3: Vulnerability Scanner & Matrice di Conformità MITRE D3FEND
@@ -301,11 +345,11 @@ export function ExportReportModal({
     doc.setTextColor(0, 240, 255);
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text('VULNERABILITY SCAN & MATRICE DI CONFORMITÀ MITRE D3FEND', 14, 16);
+    doc.text('VULNERABILITY SCAN & MAPPATURA TECNICA MITRE D3FEND', 14, 16);
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Framework di riferimento: MITRE D3FEND • NIST CSF 2.0 • Direttiva UE NIS2 | Committente: ${clientClean}`, 14, 23);
+    doc.text(`Framework tecnici di riferimento: MITRE D3FEND • NIST CSF 2.0 • Mappatura Tecnica di Riferimento | Committente: ${clientClean}`, 14, 23);
 
     // Tabella 3.A: Vulnerability findings
     const vulnLabelMap: Record<string, string> = {
@@ -322,14 +366,14 @@ export function ExportReportModal({
     const vulnRows: string[][] = Object.entries(safeVuln).length > 0
       ? Object.entries(safeVuln).map(([k, v]) => {
           const rawStatus = String(v?.status || '').toLowerCase();
-          let s = 'PROTETTO';
+          let s = 'NESSUNA ANOMALIA';
 
           if (rawStatus === 'fail' || rawStatus === 'critical' || rawStatus === 'crit') {
             s = 'RISCHIO';
           } else if (rawStatus === 'warning' || rawStatus === 'warn' || rawStatus === 'attention') {
             s = 'ATTENZIONE';
           } else if (rawStatus === 'pass' || rawStatus === 'success' || rawStatus === 'ok') {
-            s = 'PROTETTO';
+            s = 'NESSUNA ANOMALIA';
           } else if (!rawStatus || rawStatus === 'idle' || rawStatus === 'skipped') {
             s = 'NON ESEGUITO';
           } else if (rawStatus === 'error') {
@@ -338,12 +382,19 @@ export function ExportReportModal({
 
           let det = 'Scansione endpoint eseguita con successo';
           if (k === 'files') {
-            const exp = v?.result?.exposedFiles?.length || 0;
-            if (exp > 0) {
+            const rawExposed = (v?.result?.exposedFiles || []) as Array<{ path?: string; risk?: string }>;
+            const realExposed = rawExposed.filter(f => {
+              const p = (f.path || '').toLowerCase();
+              return !p.includes('robots.txt') && !p.includes('security.txt');
+            });
+
+            if (realExposed.length > 0) {
               s = 'RISCHIO';
-              det = `Rilevati ${exp} file sensibili esposti (.env, .git, backup)`;
+              const names = realExposed.map(f => f.path).slice(0, 3).join(', ');
+              det = `Rilevati ${realExposed.length} file sensibili esposti (${names})`;
             } else {
-              det = 'Nessun file di ambiente o backup esposto';
+              s = 'NESSUNA ANOMALIA';
+              det = 'Tutti i percorsi sensibili (.env, .git, dump SQL) risultano protetti (404/403/redirect)';
             }
           } else if (k === 'secrets') {
             const sec = v?.result?.detectedSecrets?.length || 0;
@@ -351,13 +402,13 @@ export function ExportReportModal({
               s = 'RISCHIO';
               det = `Trovati ${sec} token o segreti hardcodati nei file JS`;
             } else {
-              det = 'Nessuna API key o token rilevato nel bundle';
+              det = 'Nessuna API key o token rilevato nel bundle analizzato';
             }
           } else if (v?.result && typeof v.result === 'object') {
             if ('message' in (v.result as Record<string, unknown>)) {
-              det = String((v.result as Record<string, unknown>).message).slice(0, 90);
+              det = String((v.result as Record<string, unknown>).message);
             } else if ('summary' in (v.result as Record<string, unknown>)) {
-              det = String((v.result as Record<string, unknown>).summary).slice(0, 90);
+              det = String((v.result as Record<string, unknown>).summary);
             }
           }
 
@@ -365,10 +416,7 @@ export function ExportReportModal({
           return [label, s, det];
         })
       : [
-          ['FILE SENSIBILI (.ENV / .GIT)', 'PROTETTO', 'Nessun file critico esposto o scaricabile pubblicamente'],
-          ['COOKIE FLAGS (SECURE / SAMESITE)', 'PROTETTO', 'Flag SameSite e HttpOnly convalidati'],
-          ['PROTEZIONE CLICKJACKING (FRAME)', 'PROTETTO', 'Header X-Frame-Options SAMEORIGIN attivo'],
-          ['WAF / CLOUD PERIMETER', 'INFORMATIVO', 'Verifica presenza Cloudflare / reverse proxy'],
+          ['Scansione Vulnerabilità Web', 'NON ESEGUITO', 'Nessuna scansione di misconfigurazione o file sensibili eseguita in questa sessione.']
         ];
 
     autoTable(doc, {
@@ -404,21 +452,131 @@ export function ExportReportModal({
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('PIANO DI BONIFICA & MAPPATURA FORMALE MITRE / NIST / NIS2:', 14, mitreStartY);
+    doc.text('PIANO DI BONIFICA CONTESTUALE (FINDING-DRIVEN) & RIFERIMENTI TECNICI:', 14, mitreStartY);
 
-    const frameworkRows = [
-      ['HSTS & Strict HTTPS', 'MITRE: D3-AHA', 'CWE-319', 'Nginx add_header Strict-Transport-Security "max-age=31536000; preload";', 'Alta'],
-      ['Content Security Policy', 'MITRE: D3-AHC', 'CWE-79', 'add_header Content-Security-Policy "default-src \'self\' https:;";', 'Media'],
-      ['Anti-Clickjacking Frame', 'MITRE: D3-AHA', 'CWE-1021', 'add_header X-Frame-Options "SAMEORIGIN"; add_header X-Content-Type-Options "nosniff";', 'Media'],
-      ['Autenticazione DMARC', 'MITRE: D3-MHA', 'CWE-345', '_dmarc IN TXT "v=DMARC1; p=quarantine; sp=quarantine; pct=100; aspf=r;"', 'Alta'],
-      ['Filtraggio Porte Critiche', 'MITRE: D3-NTF', 'CWE-284', 'sudo ufw deny 3306; sudo ufw deny 3389; sudo ufw deny 445;', 'Critico'],
-      ['Protezione File Sensibili', 'MITRE: D3-AHA', 'CWE-538', 'location ~ /\\.(env|git) { deny all; return 404; }', 'Critico'],
-    ];
+    // Costruisce la lista di bonifiche solo dai problemi effettivamente rilevati
+    const dynamicRemediations: string[][] = [];
+
+    // 1. DMARC (Multiplo o Assente/Debole)
+    const dmarcRes = securityResults?.['dmarc']?.result as Record<string, unknown> | undefined;
+    if (dmarcRes?.multipleRecordsFound) {
+      dynamicRemediations.push([
+        'DMARC: Record Multipli Rilevati',
+        'MITRE: D3-MHA',
+        'CWE-345',
+        'RFC 7489 Sez. 6.6.3: Rimuovere il record DMARC duplicato nel DNS. La presenza di 2+ record annulla l’intera policy anti-spoofing.',
+        'Critico'
+      ]);
+    } else if (dmarcRes && (dmarcRes.status === 'fail' || dmarcRes.policy === 'none')) {
+      dynamicRemediations.push([
+        'Inasprimento Policy DMARC',
+        'MITRE: D3-MHA',
+        'CWE-345',
+        'Passare la policy DMARC da "p=none" a "p=quarantine" o "p=reject" per bloccare attivamente l’invio di email fraudolente.',
+        'Alta'
+      ]);
+    }
+
+    // 2. Content-Security-Policy (CSP)
+    const secHeaders = securityResults?.['headers']?.result as { audit?: Array<{ header: string; present: boolean }> } | undefined;
+    const httpHeaders = (results['http']?.data as { headers?: Record<string, string> } | undefined)?.headers;
+    const hasCspConfigured = secHeaders?.audit?.some(a => a.header === 'Content-Security-Policy' && a.present) || Boolean(httpHeaders?.['content-security-policy']);
+    if (!hasCspConfigured) {
+      dynamicRemediations.push([
+        'Content-Security-Policy (CSP) Assente',
+        'MITRE: D3-AHC',
+        'CWE-79',
+        'Aggiungere l’header Content-Security-Policy nel web server per mitigare vulnerabilità XSS e iniezioni arbitrarie di risorse.',
+        'Media'
+      ]);
+    }
+
+    // 3. Information Disclosure (Versione Web Server)
+    const serverH = httpHeaders?.['server'];
+    if (serverH && (serverH.includes('/') || /\d/.test(serverH))) {
+      dynamicRemediations.push([
+        'Esposizione Versione Web Server',
+        'MITRE: D3-AHC',
+        'CWE-200',
+        'Configurare "server_tokens off;" in Nginx per nascondere la versione esatta del web server e del sistema operativo.',
+        'Bassa'
+      ]);
+    }
+
+    // 4. Verifica Porte aperte
+    const portScanRaw = results['portscan'] || results['portScan'] || (securityResults ? securityResults['ports'] : null);
+    const openPortsList = (portScanRaw?.data?.openPorts || portScanRaw?.result?.openPorts || []) as number[];
+    const criticalPorts = openPortsList.filter(p => [21, 23, 3306, 5432, 27017, 6379, 9200, 3389, 445].includes(p));
+    if (criticalPorts.length > 0) {
+      dynamicRemediations.push([
+        `Porte Critiche Esposte (${criticalPorts.join(', ')})`,
+        'MITRE: D3-NTF',
+        'CWE-284',
+        `Limitare l'accesso alle porte ${criticalPorts.join(', ')} a livello firewall perimetrale o consentire il binding solo su interfaccia locale/VPN.`,
+        'Critico'
+      ]);
+    }
+
+    // 5. Verifica File Sensibili (esclude categoricamente file pubblici standard come robots.txt)
+    const filesRaw = vulnerabilityResults ? vulnerabilityResults['files'] : null;
+    const rawFiles = (filesRaw?.result?.exposedFiles || filesRaw?.data?.exposedFiles || []) as Array<{ path: string; risk?: string }>;
+    const exposedFiles = rawFiles.filter(f => {
+      const p = (f.path || '').toLowerCase();
+      return !p.includes('robots.txt') && !p.includes('security.txt') && (f.risk === 'critical' || f.risk === 'high');
+    });
+
+    if (exposedFiles.length > 0) {
+      const paths = exposedFiles.map(f => f.path).slice(0, 3).join(', ');
+      dynamicRemediations.push([
+        `Esposizione File Sensibili (${paths})`,
+        'MITRE: D3-AHA',
+        'CWE-538',
+        'Rimuovere i file esposti dalla webroot e configurare il web server per negare l\'accesso a file e directory nascoste o di backup.',
+        'Critico'
+      ]);
+    }
+
+    // 6. Verifica Certificato SSL
+    const sslRaw = results['ssl'] || (securityResults ? securityResults['tls'] : null);
+    const sslData = sslRaw?.data || sslRaw?.result;
+    if (sslData && (sslData.is_expired || sslData.days_remaining <= 0)) {
+      dynamicRemediations.push([
+        'Certificato SSL/TLS Scaduto',
+        'MITRE: D3-EPSC',
+        'CWE-295',
+        'Rinnovare immediatamente il certificato crittografico X.509 associato all\'hostname.',
+        'Critico'
+      ]);
+    }
+
+    // 7. Header HSTS
+    const headersRaw = results['headers'] || (securityResults ? securityResults['headers'] : null);
+    const hData = headersRaw?.data || headersRaw?.result;
+    if (hData && hData.hsts && !hData.hsts.present && !httpHeaders?.['strict-transport-security']) {
+      dynamicRemediations.push([
+        'HSTS Non Configurato',
+        'MITRE: D3-AHA',
+        'CWE-319',
+        'Abilitare l\'header Strict-Transport-Security con max-age di almeno 1 anno per forzare HTTPS.',
+        'Alta'
+      ]);
+    }
+
+    // Se non vi sono anomalie critiche, inserisce hardening preventivo esplicito
+    if (dynamicRemediations.length === 0) {
+      dynamicRemediations.push([
+        'Hardening Preventivo Generale',
+        'MITRE: D3-MHA',
+        'N/A',
+        'Nessuna vulnerabilità critica attiva riscontrata. Mantenere le policy di patching continuo del software applicativo e monitoraggio reputazionale.',
+        'Bassa'
+      ]);
+    }
 
     autoTable(doc, {
       startY: mitreStartY + 4,
-      head: [['Vettore di Controllo', 'MITRE D3FEND', 'CWE ID', 'Contromisura Tecnica Raccomandata', 'Priorità']],
-      body: frameworkRows,
+      head: [['Vettore Rilevato', 'Rif. Tecnico', 'CWE ID', 'Raccomandazione di Bonifica Mirata', 'Priorità']],
+      body: dynamicRemediations,
       theme: 'grid',
       headStyles: {
         fillColor: [15, 23, 42],
@@ -427,15 +585,16 @@ export function ExportReportModal({
         fontSize: 8
       },
       columnStyles: {
-        0: { cellWidth: 36, fontStyle: 'bold' },
-        1: { cellWidth: 26, fontStyle: 'bold', textColor: [2, 132, 199] },
+        0: { cellWidth: 42, fontStyle: 'bold' },
+        1: { cellWidth: 24, fontStyle: 'bold', textColor: [2, 132, 199] },
         2: { cellWidth: 18 },
         3: { cellWidth: 'auto', fontStyle: 'italic', fontSize: 7 },
         4: { cellWidth: 20, fontStyle: 'bold' },
       },
       styles: {
         fontSize: 7.5,
-        cellPadding: 2
+        cellPadding: 2.5,
+        overflow: 'linebreak'
       }
     });
 
@@ -457,24 +616,23 @@ export function ExportReportModal({
 
     const pentestRows: string[][] = (pentestResults?.probes && pentestResults.probes.length > 0)
       ? pentestResults.probes.map((p: any) => {
-          const s = p.status === 'passed' ? 'PROTETTO' : p.status === 'vulnerable' ? `VULN (${String(p.severity).toUpperCase()})` : p.status === 'skipped' ? 'N/A' : 'ERRORE';
+          let s = 'NON VALUTATO';
+          if (p.status === 'passed') {
+            s = p.category === 'governance' ? 'CONFORME' : 'NESSUNA ANOMALIA';
+          } else if (p.status === 'vulnerable') {
+            s = `VULN (${String(p.severity).toUpperCase()})`;
+          } else if (p.status === 'inconclusive') {
+            s = 'INCONCLUSIVO';
+          } else if (p.status === 'skipped') {
+            s = 'NON APPLICABILE';
+          } else if (p.status === 'error') {
+            s = 'ERRORE PROBE';
+          }
           const ev = (p.evidence ? `${p.evidence} - ` : '') + (p.technicalDetails || p.remediationAdvice || '-');
-          return [p.name || p.id, s, (p.cwe || p.owaspCategory || '-').toUpperCase(), ev.slice(0, 85)];
+          return [p.name || p.id, s, (p.cwe || p.owaspCategory || '-').toUpperCase(), ev];
         })
       : [
-          ['Origin Server IP Direct Leak', 'PROTETTO', 'CWE-200', 'IP reale del backend non bypassa il perimetro'],
-          ['CORS Origin Reflection & Wildcard', 'PROTETTO', 'CWE-942', 'Nessuna riflessione automatica dell\'header Origin'],
-          ['Clickjacking & Frame Embedability', 'PROTETTO', 'CWE-1021', 'Header X-Frame-Options SAMEORIGIN attivo'],
-          ['Cookie Security (Flags & Scope)', 'PROTETTO', 'CWE-614', 'Flag HttpOnly e Secure applicati'],
-          ['TLS / Cipher Suite Hardening', 'PROTETTO', 'CWE-326', 'Crittografia TLS 1.3 forzata, cifrari deboli disabilitati'],
-          ['Subdomain Takeover Dangling CNAME', 'PROTETTO', 'CWE-284', 'Nessun record CNAME orfano su provider cloud'],
-          ['Open Redirect & Path Traversal', 'PROTETTO', 'CWE-601', 'Redirect convalidati, nessuna evasione path'],
-          ['Exposed Sensitive Files & Source Leaks', 'PROTETTO', 'CWE-538', 'File .env, .git e backup inaccessibili'],
-          ['Hardcoded Secrets in Frontend Bundles', 'PROTETTO', 'CWE-798', 'Nessuna chiave API o segreto nei JS bundle'],
-          ['Server-Side Request Forgery (SSRF)', 'PROTETTO', 'CWE-918', 'Endpoint proxy/URL non esposti'],
-          ['Web Cache Poisoning & Smuggling', 'PROTETTO', 'CWE-444', 'Nessuna anomalia parsing HTTP Request Smuggling'],
-          ['Bad Bot & Automated Scraper Protection', 'PROTETTO', 'CWE-799', 'Blocco user-agent malevoli e rate-limiting attivo'],
-          ['AI Scraper Governance (robots.txt & ai.txt)', 'PROTETTO', 'OWASP LLM', 'Direttive disallow per GPTBot, ClaudeBot e Bytespider']
+          ['Suite Pentest', 'NON ESEGUITO', 'N/A', 'Nessuna sonda di penetration testing empirico eseguita in questa sessione.']
         ];
 
     autoTable(doc, {
@@ -489,26 +647,32 @@ export function ExportReportModal({
         fontSize: 8
       },
       columnStyles: {
-        0: { cellWidth: 55, fontStyle: 'bold' },
-        1: { cellWidth: 28, halign: 'center' },
+        0: { cellWidth: 50, fontStyle: 'bold' },
+        1: { cellWidth: 32, halign: 'center' },
         2: { cellWidth: 26, fontStyle: 'bold' },
         3: { cellWidth: 'auto', fontSize: 7 }
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 1) {
           const val = String(data.cell.raw);
-          if (val === 'PROTETTO' || val.includes('PROTETTO')) {
+          if (val === 'NESSUNA ANOMALIA' || val === 'CONFORME') {
             data.cell.styles.textColor = [16, 185, 129];
             data.cell.styles.fontStyle = 'bold';
           } else if (val.includes('VULN') || val.includes('CRITICO')) {
             data.cell.styles.textColor = [239, 68, 68];
             data.cell.styles.fontStyle = 'bold';
+          } else if (val === 'INCONCLUSIVO') {
+            data.cell.styles.textColor = [245, 158, 11];
+            data.cell.styles.fontStyle = 'bold';
+          } else {
+            data.cell.styles.textColor = [148, 163, 184];
           }
         }
       },
       styles: {
         fontSize: 7.5,
-        cellPadding: 2
+        cellPadding: 2.5,
+        overflow: 'linebreak'
       }
     });
 

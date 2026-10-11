@@ -23,10 +23,40 @@ export function useSecurityAudit() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [overallScore, setOverallScore] = useState<number | null>(null);
 
+  const resetResults = () => {
+    setResults({
+      spf: null,
+      dkim: null,
+      dmarc: null,
+      dnssec: null,
+      headers: null,
+      tls: null,
+      admin: null,
+      subdomains: null,
+      blacklist: null,
+      ports: null,
+      emailArmor: null,
+      leaks: null,
+    });
+    setOverallScore(null);
+  };
+
   const updateResult = (id: string, update: Partial<TestResult>) => {
     setResults(prev => {
-      const current = prev[id] || { id, name: id, status: 'idle', timestamp: Date.now() };
-      return { ...prev, [id]: { ...current, ...update, timestamp: Date.now() } as TestResult };
+      const current = prev[id];
+      const shouldClearPayload = update.status === 'running' || update.status === 'error';
+      return {
+        ...prev,
+        [id]: {
+          id,
+          name: id,
+          status: 'idle',
+          ...(shouldClearPayload ? {} : current),
+          ...update,
+          timestamp: Date.now(),
+          ...(shouldClearPayload && !update.result ? { result: undefined } : {})
+        } as TestResult
+      };
     });
   };
 
@@ -43,7 +73,7 @@ export function useSecurityAudit() {
   const runTest = async (id: string, endpoint: string, target: string) => {
     const cleanTarget = (target || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     setLoading(prev => ({ ...prev, [id]: true }));
-    updateResult(id, { status: 'running' });
+    updateResult(id, { status: 'running', result: undefined, error: undefined });
 
     try {
       const targetEndpoints = ['headers', 'ports', 'admin'];
@@ -58,16 +88,17 @@ export function useSecurityAudit() {
           error: undefined
         });
       } else {
-        updateResult(id, { status: 'fail', error: data.error });
+        updateResult(id, { status: 'error', error: data.error || 'Test non riuscito', result: undefined });
       }
     } catch {
-      updateResult(id, { status: 'fail', error: 'Test fallito' });
+      updateResult(id, { status: 'error', error: 'Errore di connessione durante l’audit', result: undefined });
     } finally {
       setLoading(prev => ({ ...prev, [id]: false }));
     }
   };
 
   const runAll = async (target: string) => {
+    resetResults();
     const tests = [
       { id: 'spf', endpoint: 'spf' },
       { id: 'dkim', endpoint: 'dkim' },
@@ -135,5 +166,5 @@ export function useSecurityAudit() {
     doc.save(`security-audit-${domain}-${Date.now()}.pdf`);
   };
 
-  return { results, loading, overallScore, runAll, generatePDF };
+  return { results, loading, overallScore, runAll, generatePDF, resetResults };
 }

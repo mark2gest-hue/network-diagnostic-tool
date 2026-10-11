@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import dns from 'dns/promises';
 import { domainSchema, formatZodError } from '@/lib/validators';
+import { resolveAuthoritativeTxt } from '@/lib/dns-authoritative';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,16 +17,31 @@ export async function GET(req: Request) {
   try {
     const validatedDomain = validation.data;
     const query = `_dmarc.${validatedDomain}`;
-    const txtRecords = await dns.resolveTxt(query);
-    const dmarcRecord = txtRecords.flat().find(r => r.startsWith('v=DMARC1'));
+    const txtRecords = await resolveAuthoritativeTxt(validatedDomain, query);
+    const dmarcRecords = txtRecords
+      .map(chunks => chunks.join(''))
+      .filter(r => r.startsWith('v=DMARC1'));
 
-    if (!dmarcRecord) {
+    if (dmarcRecords.length === 0) {
       return NextResponse.json({
         status: 'fail',
         message: 'Record DMARC mancante',
         recommendation: 'Configura un record DMARC per definire come gestire le email che falliscono SPF/DKIM.'
       });
     }
+
+    if (dmarcRecords.length > 1) {
+      return NextResponse.json({
+        status: 'fail',
+        records: dmarcRecords,
+        record: dmarcRecords[0],
+        multipleRecordsFound: true,
+        message: `Rilevati record DMARC multipli (${dmarcRecords.length} record presenti)`,
+        recommendation: 'RFC 7489 Sezione 6.6.3: la presenza di più di un record DMARC TXT invalida la policy e i mail server valutano il messaggio come privo di DMARC. Rimuovere immediatamente il record duplicato dal DNS.'
+      });
+    }
+
+    const dmarcRecord = dmarcRecords[0];
 
     const policyMatch = dmarcRecord.match(/p=([^;]+)/);
     const policy = policyMatch ? policyMatch[1] : 'unknown';
@@ -47,6 +62,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       status,
+      valid: status !== 'fail',
       record: dmarcRecord,
       policy,
       message,

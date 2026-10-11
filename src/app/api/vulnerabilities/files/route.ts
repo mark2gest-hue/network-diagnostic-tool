@@ -23,9 +23,7 @@ const SENSITIVE_FILES = [
   { path: '/wp-json/wp/v2/users', label: 'WordPress User Enumeration REST API', risk: 'medium' },
   { path: '/phpinfo.php', label: 'PHP Info Telemetria (phpinfo.php)', risk: 'high' },
   { path: '/server-status', label: 'Apache Server Status', risk: 'medium' },
-  { path: '/web.config', label: 'Configurazione IIS (web.config)', risk: 'high' },
-  { path: '/.well-known/security.txt', label: 'Security Policy (security.txt)', risk: 'info' },
-  { path: '/robots.txt', label: 'Robots File (robots.txt)', risk: 'info' }
+  { path: '/web.config', label: 'Configurazione IIS (web.config)', risk: 'high' }
 ];
 
 export async function GET(req: Request) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { targetSchema, formatZodError } from '@/lib/validators';
+import { safeHttpProbe } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,20 +18,17 @@ export async function GET(req: Request) {
   const baseUrl = validatedTarget.startsWith('http') ? validatedTarget : `https://${validatedTarget}`;
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const res = await fetch(baseUrl, {
+    const res = await safeHttpProbe(baseUrl, {
       method: 'GET',
-      signal: controller.signal,
-      redirect: 'follow'
+      timeout: 5000,
     });
-    clearTimeout(timeout);
 
-    // Estrai header Set-Cookie
-    const setCookieHeaders = res.headers.getSetCookie 
-      ? res.headers.getSetCookie() 
-      : [res.headers.get('set-cookie')].filter(Boolean) as string[];
+    const rawCookies = res.headers['set-cookie'];
+    const setCookieHeaders = Array.isArray(rawCookies)
+      ? rawCookies
+      : typeof rawCookies === 'string'
+      ? [rawCookies]
+      : [];
 
     if (setCookieHeaders.length === 0) {
       return NextResponse.json({

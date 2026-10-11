@@ -11,14 +11,25 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Button } from '@/components/ui/button';
 import { BigScore, ActionCard, StatusPill, RowList, ExpandableRow, CommandBlock } from '@/components/ui/nd';
+import { extractFindingsFromResults, calculateRiskAssessment } from '@/lib/risk-engine';
 
-interface ExecutiveRemediationSummaryProps {
+export interface ExecutiveRemediationSummaryProps {
   target: string;
   perspectiveMode?: 'executive' | 'it-pro';
   onOpenExportModal?: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  results?: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  internalResults?: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  securityResults?: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vulnerabilityResults?: Record<string, any> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pentestResults?: Record<string, any> | null;
 }
 
-interface RemediationItem {
+export interface RemediationItem {
   id: string;
   category: 'email' | 'web' | 'network' | 'dns';
   severity: 'critical' | 'high' | 'medium' | 'info';
@@ -26,7 +37,7 @@ interface RemediationItem {
   threatDescription: string;
   businessImpact: string;
   solutionCommand: string;
-  solutionType: 'BIND / DNS' | 'Nginx' | 'Firewall / UFW' | 'Cloudflare';
+  solutionType: 'BIND / DNS' | 'Nginx / Web Server' | 'Firewall / UFW' | 'Cloudflare / Edge' | 'Policy / Config';
   mitreDefend?: string;
   cwe?: string;
   nistCsf?: string;
@@ -35,7 +46,12 @@ interface RemediationItem {
 export function ExecutiveRemediationSummary({ 
   target, 
   perspectiveMode = 'executive',
-  onOpenExportModal 
+  onOpenExportModal,
+  results,
+  internalResults,
+  securityResults,
+  vulnerabilityResults,
+  pentestResults,
 }: ExecutiveRemediationSummaryProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
@@ -46,112 +62,254 @@ export function ExecutiveRemediationSummary({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const contextualNotes = [
-    {
-      category: 'Servizi Fisiologici & Falsi Positivi',
-      title: 'Percorso /login & Porta 22 (SSH)',
-      status: 'Operativo Legittimo',
-      statusClass: 'bg-[#0284c7]/20 text-[#38bdf8] border-[#0369a1]',
-      explanation: 'La segnalazione del percorso /login non rappresenta una vulnerabilità, ma il normale punto di accesso autenticato per gli utenti della piattaforma. Analogamente, la porta SSH (22) è attiva per la manutenzione remota del server ed è protetta da cifratura asimmetrica con chiave privata ed esclusione password.',
-      action: 'Nessuna azione urgente richiesta. Facoltativo: limitare la porta 22 solo agli IP aziendali tramite regole firewall UFW.'
-    },
-    {
-      category: 'Email Authentication',
-      title: 'SPF Attivo & DMARC in Modalità Monitoraggio',
-      status: 'In Corso di Hardening',
-      statusClass: 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]',
-      explanation: 'Il record SPF è stato configurato e risulta SUPERATO (v=spf1 include:_spf.google.com~all). La policy DMARC è impostata su p=none: si tratta di una modalità prudenziale di telemetria che monitora i flussi di posta senza scartarli.',
-      action: 'Consigliato inasprire la policy DMARC da "p=none" a "p=quarantine" per bloccare attivamente i tentativi di phishing e spoofing.'
-    },
-    {
-      category: 'Web Server Hardening',
-      title: 'Protezione HTTPS, HSTS & Anti-Clickjacking',
-      status: 'Conforme Standard Moderni',
-      statusClass: 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
-      explanation: 'Il web server Nginx applica forzatura HSTS con durata 365 giorni e preload, bloccando attacchi Man-in-the-Middle e SSL Stripping. È attiva la protezione Clickjacking con X-Frame-Options: SAMEORIGIN e MIME-sniffing nosniff.',
-      action: 'Completare l\'hardening aggiungendo una Content-Security-Policy (CSP) permissiva per i caricamenti di risorse esterne.'
-    },
-    {
-      category: 'Infrastruttura di Rete',
-      title: 'Protezione IP di Origine & WAF',
-      status: 'Raccomandazione Architetturale',
-      statusClass: 'bg-[#7c3aed]/20 text-[#c084fc] border-[#6d28d9]',
-      explanation: 'Il traffico raggiunge direttamente l\'IP del server cloud senza passare da una rete WAF perimetrale (es. Cloudflare Proxy).',
-      action: 'Per ambienti ad alto traffico o esposti a tentativi di attacchi volumetrici DDoS, si consiglia di anteporre il proxy WAF Cloudflare gratuito.'
-    }
-  ];
+  // Consolidamento dei risultati grezzi di tutti i moduli diagnostici
+  const consolidatedRaw = React.useMemo(() => {
+    return {
+      ...(results || {}),
+      security: securityResults || undefined,
+      vulnerabilities: vulnerabilityResults || undefined,
+      pentest: pentestResults || undefined,
+      internal: internalResults || undefined,
+    };
+  }, [results, securityResults, vulnerabilityResults, pentestResults, internalResults]);
 
-  const remediationList: RemediationItem[] = [
-    {
-      id: 'fix-dmarc',
-      category: 'email',
-      severity: 'high',
-      title: 'Inasprimento Policy DMARC (da p=none a p=quarantine)',
-      threatDescription: 'La policy attuale non ordina ai server di scartare le mail fraudolente non autenticate.',
-      businessImpact: 'Mancata conformità con le direttive Google/Yahoo 2024 e mancata protezione anti-phishing.',
-      solutionType: 'BIND / DNS',
-      solutionCommand: `_dmarc.${target}. IN TXT "v=DMARC1; p=quarantine; sp=quarantine; pct=100; rua=mailto:dmarc-reports@${target}; aspf=r;"`,
-      mitreDefend: 'D3-MHA',
-      cwe: 'CWE-345',
-      nistCsf: 'PR.DS-6',
-    },
-    {
-      id: 'fix-dkim',
-      category: 'email',
-      severity: 'medium',
-      title: 'Verifica Selettore Firma DKIM',
-      threatDescription: 'Nessun selettore standard individuato automaticamente dal crawler.',
-      businessImpact: 'Firma crittografica non convalidabile da alcuni provider di posta selettivi.',
-      solutionType: 'BIND / DNS',
-      solutionCommand: `google._domainkey.${target}. IN TXT "v=DKIM1; k=rsa; p=CHIAVE_PUBBLICA_DKIM..."`,
-      mitreDefend: 'D3-MHA',
-      cwe: 'CWE-345',
-      nistCsf: 'PR.DS-6',
-    },
-    {
-      id: 'fix-csp',
-      category: 'web',
-      severity: 'medium',
-      title: 'Implementazione Content-Security-Policy (CSP)',
-      threatDescription: 'Manca la direttiva CSP per controllare le origini di script e iframe.',
-      businessImpact: 'Rischio potenziale di Cross-Site Scripting (XSS) in caso di inclusioni esterne.',
-      solutionType: 'Nginx',
-      solutionCommand: `add_header Content-Security-Policy "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';" always;`,
-      mitreDefend: 'D3-AHC',
-      cwe: 'CWE-79',
-      nistCsf: 'PR.PT-1',
-    },
-    {
-      id: 'fix-waf',
-      category: 'network',
-      severity: 'info',
-      title: 'Attivazione Scudo WAF / Reverse Proxy Cloudflare',
-      threatDescription: 'L’IP del server è direttamente esposto su Internet senza filtro DDoS.',
-      businessImpact: 'Vulnerabilità a flood volumetrici e scansioni automatizzate di botnet.',
-      solutionType: 'Cloudflare',
-      solutionCommand: `# Abilitare Proxy Cloudflare (Orange Cloud) sui record A di ${target}\n# Impostare Security Level su 'Medium' o 'High' e WAF Rate Limiting`,
-      mitreDefend: 'D3-NTF',
-      cwe: 'CWE-400',
-      nistCsf: 'PR.AC-5',
-    },
-    {
-      id: 'fix-ssh',
-      category: 'network',
-      severity: 'info',
-      title: 'Restrizione Accesso SSH Porta 22 su Firewall',
-      threatDescription: 'La porta di amministrazione 22 risponde pubblicamente su tutti gli IP.',
-      businessImpact: 'Tentativi di brute-force automatici nei log di sistema.',
-      solutionType: 'Firewall / UFW',
-      solutionCommand: `sudo ufw limit 22/tcp\n# Oppure restringi solo all'IP del tuo ufficio:\n# sudo ufw allow from <TUO_IP_UFFICIO> to any port 22 proto tcp`,
-      mitreDefend: 'D3-NTF',
-      cwe: 'CWE-284',
-      nistCsf: 'PR.AC-4',
-    },
-  ];
+  // Estrazione deterministica dei finding e calcolo della postura di rischio
+  const findings = React.useMemo(() => {
+    return extractFindingsFromResults(consolidatedRaw);
+  }, [consolidatedRaw]);
+
+  const assessment = React.useMemo(() => {
+    return calculateRiskAssessment(findings, consolidatedRaw);
+  }, [findings, consolidatedRaw]);
+
+  // Rileva se almeno un test ha completato l'esecuzione
+  const hasExecutedTests = React.useMemo(() => {
+    const rawEntries = Object.values(results || {}).filter(
+      (r) => r && r.status !== 'idle' && r.status !== 'running'
+    );
+    const secEntries = Object.values(securityResults || {}).filter(
+      (r) => r && r.status !== 'idle' && r.status !== 'running'
+    );
+    const vulnEntries = Object.values(vulnerabilityResults || {}).filter(
+      (r) => r && r.status !== 'idle' && r.status !== 'running'
+    );
+    const hasPentest = Boolean(
+      pentestResults &&
+        ((pentestResults.tests && pentestResults.tests.length > 0) ||
+          (Array.isArray(pentestResults) && pentestResults.length > 0))
+    );
+    return rawEntries.length > 0 || secEntries.length > 0 || vulnEntries.length > 0 || hasPentest;
+  }, [results, securityResults, vulnerabilityResults, pentestResults]);
+
+  // Mappatura dinamica dei finding verso il piano di remediation
+  const remediationList: RemediationItem[] = React.useMemo(() => {
+    return findings.map((f): RemediationItem => {
+      let solType: RemediationItem['solutionType'] = 'Nginx / Web Server';
+      let category: RemediationItem['category'] = 'web';
+      let mitre = 'D3-AHC';
+      let cwe = 'CWE-16';
+      let nist = 'PR.IP-1';
+
+      const fid = f.id.toLowerCase();
+      if (fid.includes('dmarc') || fid.includes('spf') || fid.includes('dkim') || fid.includes('mx') || fid.includes('email')) {
+        category = 'email';
+        solType = 'BIND / DNS';
+        mitre = 'D3-MHA';
+        cwe = fid.includes('dmarc') ? 'CWE-345' : 'CWE-290';
+        nist = 'PR.DS-6';
+      } else if (fid.includes('dns') || fid.includes('ptr') || fid.includes('soa') || fid.includes('ns')) {
+        category = 'dns';
+        solType = 'BIND / DNS';
+        mitre = 'D3-DNS';
+        cwe = 'CWE-345';
+        nist = 'PR.DS-6';
+      } else if (fid.includes('port') || fid.includes('ssh') || fid.includes('firewall') || fid.includes('telnet') || fid.includes('ftp')) {
+        category = 'network';
+        solType = 'Firewall / UFW';
+        mitre = 'D3-NTF';
+        cwe = 'CWE-284';
+        nist = 'PR.AC-4';
+      } else if (fid.includes('ttfb') || fid.includes('latency') || fid.includes('ddos') || fid.includes('waf')) {
+        category = 'network';
+        solType = 'Cloudflare / Edge';
+        mitre = 'D3-NTF';
+        cwe = 'CWE-400';
+        nist = 'PR.AC-5';
+      } else if (fid.includes('hsts')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-ENCR';
+        cwe = 'CWE-319';
+        nist = 'PR.DS-2';
+      } else if (fid.includes('csp')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-AHC';
+        cwe = 'CWE-79';
+        nist = 'PR.PT-1';
+      } else if (fid.includes('xfo') || fid.includes('clickjack')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-AHC';
+        cwe = 'CWE-1021';
+        nist = 'PR.PT-1';
+      } else if (fid.includes('file') || fid.includes('env') || fid.includes('git')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-FC';
+        cwe = 'CWE-200';
+        nist = 'PR.AC-4';
+      } else if (fid.includes('cors')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-AA';
+        cwe = 'CWE-942';
+        nist = 'PR.AC-4';
+      } else if (fid.includes('cookie')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-CH';
+        cwe = 'CWE-614';
+        nist = 'PR.DS-1';
+      } else if (fid.includes('ssl') || fid.includes('tls')) {
+        category = 'web';
+        solType = 'Nginx / Web Server';
+        mitre = 'D3-CM';
+        cwe = 'CWE-295';
+        nist = 'PR.DS-2';
+      } else if (fid.includes('blacklist') || fid.includes('dnsbl')) {
+        category = 'network';
+        solType = 'Policy / Config';
+        mitre = 'D3-RA';
+        cwe = 'CWE-358';
+        nist = 'DE.CM-1';
+      }
+
+      return {
+        id: f.id,
+        category,
+        severity: f.severity === 'critical' ? 'critical' : f.severity === 'high' ? 'high' : f.severity === 'medium' ? 'medium' : 'info',
+        title: f.title,
+        threatDescription: f.description,
+        businessImpact: f.impact || 'Possibile impatto operativo o di conformità sul perimetro esposto.',
+        solutionCommand: f.remediation?.codeSnippet || `# Azione raccomandata:\n# ${f.remediation?.action || 'Rivedere configurazione'}\n# Riferimento: ${f.remediation?.technicalReference || 'Standard di sicurezza'}`,
+        solutionType: solType,
+        mitreDefend: mitre,
+        cwe,
+        nistCsf: nist,
+      };
+    });
+  }, [findings]);
+
+  // Stato per Area Aziendale calcolato dinamicamente
+  const contextualNotes = React.useMemo(() => {
+    const emailFindings = findings.filter(f => f.category === 'configuration' && (f.id.includes('dmarc') || f.id.includes('spf') || f.id.includes('dkim')));
+    const webFindings = findings.filter(f => f.id.includes('hsts') || f.id.includes('csp') || f.id.includes('xfo') || f.id.includes('ssl') || f.id.includes('cookie'));
+    const netFindings = findings.filter(f => f.id.includes('port') || f.id.includes('blacklist') || f.id.includes('latency') || f.category === 'availability');
+    const appFindings = findings.filter(f => f.id.includes('file') || f.id.includes('cors') || f.id.startsWith('pentest'));
+
+    return [
+      {
+        category: 'Autenticazione Email & Postura Dominio',
+        title: emailFindings.length > 0 ? emailFindings[0].title : 'Configurazione SPF, DKIM & DMARC',
+        status: emailFindings.length > 0 ? (emailFindings.some(f => f.severity === 'high') ? 'Intervento Richiesto' : 'In Corso di Hardening') : 'Conforme Standard Moderni',
+        statusClass: emailFindings.length > 0 ? 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]' : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        explanation: emailFindings.length > 0 
+          ? emailFindings.map(f => f.description).join(' ') 
+          : 'I record di autenticazione email (SPF, DKIM, DMARC) risultano configurati o non sono state riscontrate anomalie nei controlli passivi.',
+        action: emailFindings.length > 0 
+          ? (emailFindings[0].remediation?.action || 'Rivedere i record DNS autorizzativi.') 
+          : 'Mantenere il monitoraggio periodico dei flussi di recapito email.'
+      },
+      {
+        category: 'Web Server Hardening & Crittografia',
+        title: webFindings.length > 0 ? webFindings[0].title : 'Protezione HTTPS, HSTS & Headers',
+        status: webFindings.length > 0 ? (webFindings.some(f => f.severity === 'high' || f.severity === 'critical') ? 'Intervento Richiesto' : 'Migliorabile') : 'Conforme Standard Moderni',
+        statusClass: webFindings.length > 0 ? 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]' : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        explanation: webFindings.length > 0
+          ? webFindings.map(f => f.description).join(' ')
+          : 'Il server applica parametri crittografici TLS validi e gli header protettivi fondamentali sono attivi.',
+        action: webFindings.length > 0
+          ? (webFindings[0].remediation?.action || 'Aggiornare la configurazione del web server.')
+          : 'Nessuna azione urgente richiesta. Verificare periodicamente il ciclo di rinnovo TLS.'
+      },
+      {
+        category: 'Infrastruttura di Rete & Porte Esterne',
+        title: netFindings.length > 0 ? netFindings[0].title : 'Superficie di Rete & Firewall',
+        status: netFindings.length > 0 ? (netFindings.some(f => f.severity === 'critical') ? 'Criticità Esposizione' : 'Attenzione') : 'Nessuna Porta Critica Rilevata',
+        statusClass: netFindings.length > 0 ? (netFindings.some(f => f.severity === 'critical') ? 'bg-[#991b1b]/20 text-[#f87171] border-[#7f1d1d]' : 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]') : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        explanation: netFindings.length > 0
+          ? netFindings.map(f => f.description).join(' ')
+          : 'I controlli sulle porte standard e sulle blacklist DNSBL non hanno evidenziato servizi database o intermediari esposti senza autorizzazione.',
+        action: netFindings.length > 0
+          ? (netFindings[0].remediation?.action || 'Restringere le regole firewall su IP fidati.')
+          : 'Mantenere attive le regole restrittive di default sul firewall perimetrale.'
+      },
+      {
+        category: 'Integrità Applicativa & File Sensibili',
+        title: appFindings.length > 0 ? appFindings[0].title : 'Superficie Applicativa & Leak',
+        status: appFindings.length > 0 ? (appFindings.some(f => f.severity === 'critical') ? 'Vulnerabilità Confermata' : 'Attenzione Richiesta') : 'Nessun Leak Rilevato',
+        statusClass: appFindings.length > 0 ? 'bg-[#991b1b]/20 text-[#f87171] border-[#7f1d1d]' : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        explanation: appFindings.length > 0
+          ? appFindings.map(f => f.description).join(' ')
+          : 'Non sono stati riscontrati file di configurazione (.env, .git), backup di database o misconfigurazioni CORS con credenziali riflettute.',
+        action: appFindings.length > 0
+          ? (appFindings[0].remediation?.action || 'Rimuovere i file esposti e correggere i permessi web.')
+          : 'Mantenere bloccate le estensioni critiche nella configurazione del reverse proxy.'
+      }
+    ];
+  }, [findings]);
+
+  // Lista ordinata per severità per i filtri IT-Pro
+  const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+  const sortedRemediations = React.useMemo(() => {
+    return [...remediationList].sort((a, b) => (severityOrder[b.severity] ?? 0) - (severityOrder[a.severity] ?? 0));
+  }, [remediationList]);
 
   const filteredList = filterSeverity === 'all'
-    ? remediationList
-    : remediationList.filter(item => item.severity === filterSeverity);
+    ? sortedRemediations
+    : sortedRemediations.filter(item => item.severity === filterSeverity);
+
+  // Top 3 azioni prioritarie da proporre all'imprenditore / team IT
+  const topActionCards = React.useMemo(() => {
+    if (sortedRemediations.length === 0) {
+      return [
+        {
+          title: 'Mantenere il monitoraggio continuo dei flussi email',
+          why: 'I record SPF e DMARC risultano attivi e non mostrano anomalie di spoofing al momento dell\'ispezione.',
+          priority: <StatusPill tone="ok">Verificato</StatusPill>,
+          snippet: undefined,
+        },
+        {
+          title: 'Supervisionare la scadenza dei certificati crittografici',
+          why: 'La crittografia TLS è operativa. Si raccomanda di accertarsi del rinnovo automatico periodico.',
+          priority: <StatusPill tone="ok">Verificato</StatusPill>,
+          snippet: undefined,
+        },
+        {
+          title: 'Preservare l\'isolamento delle porte di backend',
+          why: 'Nessuna porta di database (MySQL, PostgreSQL, Redis) è esposta su interfaccia pubblica.',
+          priority: <StatusPill tone="ok">Verificato</StatusPill>,
+          snippet: undefined,
+        }
+      ];
+    }
+
+    return sortedRemediations.slice(0, 3).map(item => ({
+      title: item.title,
+      why: item.businessImpact || item.threatDescription,
+      priority: item.severity === 'critical' ? (
+        <StatusPill tone="crit">Priorità Critica</StatusPill>
+      ) : item.severity === 'high' ? (
+        <StatusPill tone="warn">Priorità Alta</StatusPill>
+      ) : item.severity === 'medium' ? (
+        <StatusPill tone="warn">Priorità Media</StatusPill>
+      ) : (
+        <StatusPill tone="low">Priorità Bassa</StatusPill>
+      ),
+      snippet: item.solutionCommand.split('\n')[0],
+    }));
+  }, [sortedRemediations]);
 
   const downloadExecutivePdf = () => {
     const doc = new jsPDF();
@@ -169,26 +327,36 @@ export function ExecutiveRemediationSummary({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Target: ${target} | Punteggio Calcolato: 70/100 | Postura Reale Ponderata: 92/100 (Grado A)`, 14, 28);
+    const scoreText = hasExecutedTests 
+      ? `Punteggio Postura: ${assessment.overallScore}/100 (Grado ${assessment.grade})` 
+      : 'Punteggio Postura: In attesa di scansione';
+    const coverageText = `Copertura Esecutiva: ${assessment.coverage?.coveragePercentage ?? 100}%`;
+    doc.text(`Target: ${target} | ${scoreText} | ${coverageText}`, 14, 28);
     doc.text(`Data Report: ${new Date().toLocaleDateString('it-IT')} | Metodologia: Zero-Mock Low-Level Probing`, 14, 34);
 
     // Box 1: Sintesi Esecutiva & Chiarimento Punteggio
     doc.setFillColor(240, 245, 255);
-    doc.rect(14, 48, pageWidth - 28, 30, 'F');
+    doc.rect(14, 48, pageWidth - 28, 32, 'F');
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text('SINTESI ESECUTIVA & INTERPRETAZIONE DEL PUNTEGGIO:', 18, 55);
+    doc.text('SINTESI ESECUTIVA & INTERPRETAZIONE DELLA POSTURA:', 18, 55);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Il punteggio calcolato dall'algoritmo grezzo (70/100) è dovuto alla somma di 6 avvisi informativi`, 18, 62);
-    doc.text(`da 5 punti ciascuno. Esaminando l'infrastruttura reale, non sono presenti vulnerabilità critiche:`, 18, 68);
-    doc.text(`il record SPF è SUPERATO, la crittografia TLS 1.3 è attiva e i meccanismi HSTS sono pienamente operativi.`, 18, 74);
+    
+    const summaryLines = doc.splitTextToSize(assessment.summary || 'Valutazione completata senza anomalie bloccanti.', pageWidth - 36);
+    doc.text(summaryLines, 18, 62);
 
-    // Box 2: Note Metodologiche & Falsi Positivi
+    if (assessment.coverage?.caveatNotes) {
+      doc.setTextColor(180, 83, 9);
+      doc.setFontSize(8);
+      doc.text(`Nota Metodologica: ${assessment.coverage.caveatNotes}`, 18, 75);
+    }
+
+    // Box 2: Stato per Area Aziendale
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('NOTE METODOLOGICHE & CONTESTUALIZZAZIONE DEI RISCHI', 14, 86);
+    doc.text('NOTE METODOLOGICHE & CONTESTUALIZZAZIONE DEI RISCHI PER AREA', 14, 88);
 
     const notesTableData = contextualNotes.map(n => [
       n.category.toUpperCase(),
@@ -198,12 +366,12 @@ export function ExecutiveRemediationSummary({
     ]);
 
     autoTable(doc, {
-      startY: 92,
+      startY: 94,
       head: [['Ambito', 'Elemento', 'Classificazione', 'Contestualizzazione Operativa']],
       body: notesTableData,
       theme: 'grid',
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 2.5 },
+      styles: { fontSize: 7.5, cellPadding: 2.5, overflow: 'linebreak' },
       columnStyles: {
         0: { cellWidth: 32, fontStyle: 'bold' },
         1: { cellWidth: 38 },
@@ -224,16 +392,18 @@ export function ExecutiveRemediationSummary({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Interventi raccomandati per elevare il punteggio al 100/100 (Grado A+) per ${target}`, 14, 25);
+    doc.text(`Interventi raccomandati basati sulle evidenze riscontrate per ${target}`, 14, 25);
 
-    const remediationTableData = remediationList.map(r => [
-      r.severity.toUpperCase(),
-      r.title,
-      `${r.mitreDefend || 'D3-AHA'} / ${r.cwe || 'N/A'}`,
-      r.solutionType,
-      r.businessImpact,
-      r.solutionCommand
-    ]);
+    const remediationTableData = sortedRemediations.length > 0 
+      ? sortedRemediations.map(r => [
+          r.severity.toUpperCase(),
+          r.title,
+          `${r.mitreDefend || 'D3-AHA'} / ${r.cwe || 'N/A'}`,
+          r.solutionType,
+          r.businessImpact,
+          r.solutionCommand
+        ])
+      : [['INFO', 'Nessuna criticità identificata', 'N/A', 'Audit Positivo', 'Nessun intervento bloccante necessario', 'Superficie conforme ai controlli eseguiti']];
 
     autoTable(doc, {
       startY: 38,
@@ -241,7 +411,7 @@ export function ExecutiveRemediationSummary({
       body: remediationTableData,
       theme: 'grid',
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 7, cellPadding: 2.5 },
+      styles: { fontSize: 7, cellPadding: 2.5, overflow: 'linebreak' },
       columnStyles: {
         0: { cellWidth: 16, fontStyle: 'bold' },
         1: { cellWidth: 36 },
@@ -261,7 +431,6 @@ export function ExecutiveRemediationSummary({
       doc.text(`Documento riservato generato da Aiutiamoci Impresa — Diagnostic Tool Ops Pro | Pagina ${i} di ${pageCount}`, 14, doc.internal.pageSize.height - 8);
     }
 
-    // Save
     doc.save(`Executive_Report_Contestualizzato_${target}.pdf`);
   };
 
@@ -269,11 +438,14 @@ export function ExecutiveRemediationSummary({
     const reportData = {
       target,
       timestamp: new Date().toISOString(),
-      rawScore: 70,
-      weightedScore: 92,
-      grade: 'A',
+      overallScore: hasExecutedTests ? assessment.overallScore : null,
+      grade: hasExecutedTests ? assessment.grade : null,
+      coverage: assessment.coverage,
+      breakdown: assessment.breakdown,
+      summary: assessment.summary,
       contextualNotes,
-      remediations: remediationList
+      findingsCount: findings.length,
+      remediations: sortedRemediations
     };
     const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -320,23 +492,48 @@ export function ExecutiveRemediationSummary({
         </div>
       </div>
 
-      {/* Punteggio unico grande + verdetto */}
+      {/* Punteggio unico grande + verdetto calcolato dinamicamente */}
       <div className="rounded-lg border border-border bg-surface p-6 sm:p-8">
         <BigScore
-          score={92}
-          verdict="Il dominio è ben protetto."
-          tone="ok"
+          score={hasExecutedTests ? assessment.overallScore : null}
+          verdict={
+            !hasExecutedTests
+              ? `In attesa di esecuzione diagnostica per ${target}.`
+              : assessment.overallScore >= 85
+              ? 'La postura del dominio risulta solida e conforme.'
+              : assessment.overallScore >= 60
+              ? 'Attenzione richiesta su alcuni parametri di sicurezza.'
+              : 'Rilevate criticità significative che richiedono bonifica.'
+          }
+          tone={
+            !hasExecutedTests
+              ? 'neutral'
+              : assessment.overallScore >= 85
+              ? 'ok'
+              : assessment.overallScore >= 60
+              ? 'warn'
+              : 'crit'
+          }
         >
           <p className="text-[0.9375rem] text-ink-2">
-            Nessun problema urgente. Ci sono 3 miglioramenti consigliati, da girare al team IT.
+            {!hasExecutedTests
+              ? 'Avvia i moduli diagnostici per calcolare il punteggio di esposizione e la matrice delle raccomandazioni.'
+              : findings.length === 0
+              ? 'Nessun problema bloccante riscontrato nelle verifiche effettuate.'
+              : `Rilevate ${findings.length} osservazioni. Consulta i consigli prioritari sotto da girare al team IT.`}
           </p>
-          <details className="mt-3 cursor-pointer text-xs text-accent">
-            <summary className="font-semibold select-none hover:underline">Come è calcolato il punteggio</summary>
-            <div className="mt-2 space-y-1.5 rounded-md border border-border bg-field p-3 font-mono text-[0.8125rem] text-ink-2">
-              <p>• Punteggio algoritmico grezzo: 70/100 (6 avvisi informativi/warning cumulativi a -5 pt ciascuno).</p>
-              <p>• Postura reale ponderata: 92/100 (Grado A), filtrando i servizi fisiologici legittimi (login cliente, porta SSH protetta da chiave).</p>
-            </div>
-          </details>
+          {hasExecutedTests && (
+            <details className="mt-3 cursor-pointer text-xs text-accent">
+              <summary className="font-semibold select-none hover:underline">Dettaglio scomposizione punteggio</summary>
+              <div className="mt-2 space-y-1.5 rounded-md border border-border bg-field p-3 font-mono text-[0.8125rem] text-ink-2">
+                <p>• {assessment.breakdown.formulaExplanation}</p>
+                <p>• Copertura esecutiva moduli: {assessment.coverage?.coveragePercentage ?? 100}% ({assessment.coverage?.completedModules ?? 1}/{assessment.coverage?.totalModules ?? 1} completati).</p>
+                {assessment.coverage?.caveatNotes && (
+                  <p className="text-warn">⚠️ {assessment.coverage.caveatNotes}</p>
+                )}
+              </div>
+            </details>
+          )}
         </BigScore>
       </div>
 
@@ -345,32 +542,23 @@ export function ExecutiveRemediationSummary({
         <h2 className="text-[1.0625rem] font-bold text-foreground">Cosa chiedere al team IT</h2>
         
         <div className="space-y-3">
-          <ActionCard
-            n={1}
-            title="Bloccare le email false che usano il vostro dominio"
-            why="Oggi il sistema anti-phishing (DMARC) si limita a osservare. Va attivato il blocco."
-            priority={<StatusPill tone="warn">Priorità media</StatusPill>}
-          >
-            <div className="mt-2">
-              <span className="inline-block rounded bg-field border border-field-border px-2.5 py-1 font-mono text-xs text-foreground">
-                DMARC: p=none → p=quarantine
-              </span>
-            </div>
-          </ActionCard>
-
-          <ActionCard
-            n={2}
-            title="Proteggere il sito da attacchi di sovraccarico"
-            why="Il server è raggiungibile direttamente. Consigliato un filtro davanti (es. Cloudflare gratuito) se il traffico cresce."
-            priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
-          />
-
-          <ActionCard
-            n={3}
-            title="Completare la configurazione di rete"
-            why="Manca il record inverso (PTR) e il dominio risponde solo su IPv4. Nessun rischio immediato."
-            priority={<StatusPill tone="low">Priorità bassa</StatusPill>}
-          />
+          {topActionCards.map((card, idx) => (
+            <ActionCard
+              key={idx}
+              n={idx + 1}
+              title={card.title}
+              why={card.why}
+              priority={card.priority}
+            >
+              {card.snippet && (
+                <div className="mt-2">
+                  <span className="inline-block rounded bg-field border border-field-border px-2.5 py-1 font-mono text-xs text-foreground truncate max-w-full">
+                    {card.snippet}
+                  </span>
+                </div>
+              )}
+            </ActionCard>
+          ))}
         </div>
       </div>
 
@@ -378,7 +566,7 @@ export function ExecutiveRemediationSummary({
       <div className="space-y-4 pt-4">
         <div>
           <h2 className="text-[1.0625rem] font-bold text-foreground">Stato per area</h2>
-          <p className="text-[0.8125rem] text-ink-2">Apri una riga per vedere il dettaglio tecnico.</p>
+          <p className="text-[0.8125rem] text-ink-2">Apri una riga per vedere il dettaglio tecnico e l&apos;azione consigliata.</p>
         </div>
 
         <RowList>
@@ -386,12 +574,12 @@ export function ExecutiveRemediationSummary({
             <ExpandableRow
               key={idx}
               status={
-                note.category.includes('Falsi') || note.category.includes('Hardening') || note.category.includes('Servizi') ? (
+                note.status.includes('Conforme') || note.status.includes('Nessun') ? (
                   <StatusPill tone="ok" />
-                ) : note.category.includes('Email') ? (
-                  <StatusPill tone="warn" />
+                ) : note.status.includes('Intervento') || note.status.includes('Criticità') ? (
+                  <StatusPill tone="crit" />
                 ) : (
-                  <StatusPill tone="low" />
+                  <StatusPill tone="warn" />
                 )
               }
               title={note.category}
@@ -421,7 +609,7 @@ export function ExecutiveRemediationSummary({
             {/* Severity Filters */}
             <div className="flex items-center gap-1.5 text-xs">
               <span className="text-ink-3 mr-1">Filtra:</span>
-              {['all', 'high', 'medium', 'info'].map((sev) => (
+              {['all', 'critical', 'high', 'medium', 'info'].map((sev) => (
                 <button
                   key={sev}
                   type="button"
@@ -438,68 +626,79 @@ export function ExecutiveRemediationSummary({
             </div>
           </div>
 
-          <div className="space-y-3">
-            {filteredList.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-lg border border-border bg-surface p-4 space-y-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <StatusPill
-                      tone={item.severity === 'high' || item.severity === 'critical' ? 'warn' : 'low'}
-                    >
-                      {item.severity.toUpperCase()}
-                    </StatusPill>
-                    <span className="font-mono text-xs text-ink-2 bg-field px-2 py-0.5 rounded border border-field-border">
-                      {item.solutionType}
-                    </span>
-                    {item.mitreDefend && (
-                      <span className="font-mono text-xs text-accent bg-accent-bg px-2 py-0.5 rounded">
-                        MITRE: {item.mitreDefend}
+          {filteredList.length === 0 ? (
+            <div className="rounded-lg border border-border bg-surface p-6 text-center text-sm text-ink-2">
+              Nessun intervento di remediation corrispondente ai filtri attuali.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredList.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-border bg-surface p-4 space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill
+                        tone={item.severity === 'critical' ? 'crit' : item.severity === 'high' ? 'warn' : 'low'}
+                      >
+                        {item.severity.toUpperCase()}
+                      </StatusPill>
+                      <span className="font-mono text-xs text-ink-2 bg-field px-2 py-0.5 rounded border border-field-border">
+                        {item.solutionType}
                       </span>
-                    )}
-                    <h3 className="font-bold text-foreground text-sm">{item.title}</h3>
+                      {item.mitreDefend && (
+                        <span className="font-mono text-xs text-accent bg-accent-bg px-2 py-0.5 rounded">
+                          MITRE: {item.mitreDefend}
+                        </span>
+                      )}
+                      {item.cwe && (
+                        <span className="font-mono text-xs text-ink-3 bg-field px-2 py-0.5 rounded">
+                          {item.cwe}
+                        </span>
+                      )}
+                      <h3 className="font-bold text-foreground text-sm">{item.title}</h3>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(item.solutionCommand, item.id)}
+                      className="text-xs"
+                    >
+                      {copiedId === item.id ? (
+                        <>
+                          <Check className="size-3.5 mr-1 text-ok" aria-hidden="true" />
+                          Copiato
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5 mr-1" aria-hidden="true" />
+                          Copia comando
+                        </>
+                      )}
+                    </Button>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(item.solutionCommand, item.id)}
-                    className="text-xs"
-                  >
-                    {copiedId === item.id ? (
-                      <>
-                        <Check className="size-3.5 mr-1 text-ok" aria-hidden="true" />
-                        Copiato
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-3.5 mr-1" aria-hidden="true" />
-                        Copia comando
-                      </>
-                    )}
-                  </Button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-ink-2">
+                    <div className="rounded border border-border bg-field p-2.5">
+                      <span className="font-bold text-ink-3 block mb-0.5">VULNERABILITÀ RILEVATA</span>
+                      <span>{item.threatDescription}</span>
+                    </div>
+                    <div className="rounded border border-border bg-field p-2.5">
+                      <span className="font-bold text-warn block mb-0.5">IMPATTO SUL CLIENTE</span>
+                      <span>{item.businessImpact}</span>
+                    </div>
+                  </div>
+
+                  <CommandBlock
+                    command={item.solutionCommand}
+                    label="Configurazione / comando da applicare:"
+                  />
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-ink-2">
-                  <div className="rounded border border-border bg-field p-2.5">
-                    <span className="font-bold text-ink-3 block mb-0.5">VULNERABILITÀ RILEVATA</span>
-                    <span>{item.threatDescription}</span>
-                  </div>
-                  <div className="rounded border border-border bg-field p-2.5">
-                    <span className="font-bold text-warn block mb-0.5">IMPATTO SUL CLIENTE</span>
-                    <span>{item.businessImpact}</span>
-                  </div>
-                </div>
-
-                <CommandBlock
-                  command={item.solutionCommand}
-                  label="Configurazione / comando da applicare:"
-                />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

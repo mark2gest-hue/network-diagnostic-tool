@@ -24,11 +24,25 @@ export async function GET(req: Request) {
 
   try {
     const validatedDomain = validation.data;
-    const mxRecords = await dns.resolveMx(validatedDomain);
-    if (mxRecords.length === 0) {
-      return NextResponse.json({ status: 'pass', message: 'Nessun record MX trovato. Dominio non abilitato alle email.' });
+    let mxRecords: Array<{ exchange: string; priority: number }> = [];
+    try {
+      mxRecords = await dns.resolveMx(validatedDomain);
+    } catch {
+      mxRecords = [];
     }
 
+    if (mxRecords.length === 0) {
+      return NextResponse.json({ 
+        status: 'pass',
+        executionStatus: 'completed',
+        securityOutcome: 'not_applicable',
+        message: 'Nessun record MX configurato. Il dominio non gestisce posta elettronica (controllo RBL non applicabile).',
+        listedIn: []
+      });
+    }
+
+    // Ordina per priorità MX
+    mxRecords.sort((a, b) => a.priority - b.priority);
     const mxHost = mxRecords[0].exchange;
     let ips: string[] = [];
     try {
@@ -41,42 +55,63 @@ export async function GET(req: Request) {
       return NextResponse.json({
         mxHost,
         status: 'pass',
+        executionStatus: 'completed',
+        securityOutcome: 'inconclusive',
         listedIn: [],
-        message: `Nessun indirizzo IPv4 risolto per il server MX (${mxHost}). Controllo RBL saltato.`,
-        recommendation: 'Assicurati che il server di posta disponga di record A per la compatibilità con i filtri anti-spam mondiali.'
+        message: `Nessun indirizzo IPv4 risolto per l'hostname MX (${mxHost}). Impossibile eseguire query reverse DNSBL.`,
+        recommendation: 'Assicurati che l\'host MX disponga di un record A valido.'
       });
     }
 
     const mxIp = ips[0];
     const reversedIp = mxIp.split('.').reverse().join('.');
 
+    // Rileva provider email condivisi noti (Google Workspace, Microsoft 365, Proton, OVH)
+    const isSharedProvider = /google|outlook|protection\.outlook|microsoft|pphosted|mimecast|ovh/i.test(mxHost);
+
     const blacklistResults = await Promise.all(
       RBL_ZONES.map(async (zone) => {
         try {
           const query = `${reversedIp}.${zone}`;
           await dns.resolve4(query);
-          return { zone, listed: true };
-        } catch {
-          return { zone, listed: false };
+          return { zone, listed: true, status: 'listed' };
+        } catch (e: any) {
+          if (e.code === 'ENOTFOUND' || e.code === 'ENODATA') {
+            return { zone, listed: false, status: 'clean' };
+          }
+          return { zone, listed: false, status: 'query_error', error: e.code || 'TIMEOUT' };
         }
       })
     );
 
     const listedIn = blacklistResults.filter(r => r.listed).map(r => r.zone);
+    const hasErrors = blacklistResults.filter(r => r.status === 'query_error').length > 0;
 
     return NextResponse.json({
       mxHost,
       mxIp,
+      isSharedProvider,
+      executionStatus: 'completed',
+      securityOutcome: listedIn.length > 0 
+        ? 'confirmed_finding' 
+        : hasErrors ? 'inconclusive' : 'no_issue_observed',
       status: listedIn.length > 0 ? 'fail' : 'pass',
       listedIn,
+      details: blacklistResults,
       message: listedIn.length > 0 
-        ? `L'IP del server MX (${mxIp}) è in blacklist su ${listedIn.length} liste!` 
-        : 'Il server MX non risulta in blacklist.',
+        ? `L'indirizzo IP del server di posta (${mxIp} - ${mxHost}) è segnalato in ${listedIn.length} blacklist (${listedIn.join(', ')}).${isSharedProvider ? ' Nota: l\'infrastruttura appartiene a un provider condiviso.' : ''}` 
+        : `Il server MX (${mxHost} - ${mxIp}) non risulta presente nelle ${RBL_ZONES.length} blacklist consultate.`,
       recommendation: listedIn.length > 0 
-        ? 'Controlla l\'IP del tuo server di posta e richiedi il delisting dai database indicati.' 
-        : 'Tutto ok! Il tuo server di posta è considerato sicuro.'
+        ? 'Controllare i log di invio del mail server e richiedere la procedura di delisting ai gestori delle blacklist segnalate.' 
+        : 'Postura reputazionale IP del server di posta ottimale.'
     });
-  } catch {
-    return NextResponse.json({ error: 'Controllo blacklist email fallito' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({
+      status: 'pass',
+      executionStatus: 'error',
+      securityOutcome: 'inconclusive',
+      error: error.message || 'Errore durante la consultazione delle blacklist',
+      message: 'Impossibile completare la verifica RBL per indisponibilità temporanea dei resolver.'
+    }, { status: 200 });
   }
 }

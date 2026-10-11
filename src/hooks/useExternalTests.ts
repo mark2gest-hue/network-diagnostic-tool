@@ -36,24 +36,47 @@ export function useExternalTests() {
     protocols: false,
   });
 
+  const resetResults = () => {
+    setResults({
+      dns: null,
+      whois: null,
+      ping: null,
+      portscan: null,
+      ssl: null,
+      http: null,
+      rbl: null,
+      traceroute: null,
+      ipv6: null,
+      propagation: null,
+      ttfb: null,
+      reverse_dns: null,
+      protocols: null,
+    });
+  };
+
   const updateResult = (type: ExternalTestType, result: Partial<TestResult>) => {
-    setResults(prev => ({
-      ...prev,
-      [type]: {
-        id: type,
-        name: type.toUpperCase(),
-        timestamp: Date.now(),
-        status: 'idle',
-        ...prev[type],
-        ...result,
-      } as TestResult
-    }));
+    setResults(prev => {
+      const prevTest = prev[type];
+      const shouldClear = result.status === 'running' || result.status === 'error';
+      return {
+        ...prev,
+        [type]: {
+          id: type,
+          name: type.toUpperCase(),
+          timestamp: Date.now(),
+          status: 'idle',
+          ...(shouldClear ? {} : prevTest),
+          ...result,
+          ...(shouldClear && !result.result ? { result: undefined } : {})
+        } as TestResult
+      };
+    });
   };
 
   const runTest = async (type: ExternalTestType, target: string) => {
     if (!target) return;
     setLoading(prev => ({ ...prev, [type]: true }));
-    updateResult(type, { status: 'running' });
+    updateResult(type, { status: 'running', result: undefined, error: undefined });
 
     try {
       const endpoint = type === 'reverse_dns' ? 'reverse-dns' : type === 'protocols' ? 'http-protocols' : type;
@@ -72,12 +95,12 @@ export function useExternalTests() {
           else if (['fail', 'failed', 'error'].includes(s)) testStatus = 'fail';
           else testStatus = 'pass';
         }
-        updateResult(type, { status: testStatus, result: data });
+        updateResult(type, { status: testStatus, result: data, error: undefined });
       } else {
-        updateResult(type, { status: 'fail', error: data.error });
+        updateResult(type, { status: 'error', error: data.error || 'Test fallito', result: undefined });
       }
     } catch {
-      updateResult(type, { status: 'fail', error: 'Test fallito' });
+      updateResult(type, { status: 'error', error: 'Errore di connessione', result: undefined });
     } finally {
       setLoading(prev => ({ ...prev, [type]: false }));
     }
@@ -87,7 +110,9 @@ export function useExternalTests() {
     results,
     loading,
     runTest,
+    resetResults,
     runAll: async (target: string) => {
+      resetResults();
       const tests: ExternalTestType[] = [
         'dns', 
         'propagation', 

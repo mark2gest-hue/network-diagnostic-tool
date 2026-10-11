@@ -165,23 +165,46 @@ export default function Dashboard() {
     };
   }, [isDropdownOpen]);
 
-  const { results, loading, runTest, runAll } = useExternalTests();
+  const { results, loading, runTest, runAll, resetResults } = useExternalTests();
   const internalSuite = useInternalTests();
   const securitySuite = useSecurityAudit();
   const vulnerabilitySuite = useVulnerabilityScan();
   const pentestSuite = usePentestSuite();
+
+  const isExternalRunning = Object.values(loading).some(Boolean);
+  const isSecurityRunning = Object.values(securitySuite.loading).some(Boolean);
+  const isVulnRunning = Object.values(vulnerabilitySuite.loading).some(Boolean);
+  const isGlobalScanning = isExternalRunning || isSecurityRunning || isVulnRunning;
 
   const activeCount = Object.values(loading).filter(Boolean).length;
   const finishedCount = Object.values(results).filter(
     (r) => r !== null && r.status !== 'running' && r.status !== 'idle'
   ).length;
   const totalTests = MODULES.length;
+
+  const runComprehensiveScan = async (domain: string) => {
+    const clean = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!clean) return;
+    setTarget(clean);
+    setSearchInput(clean);
+
+    // Reset immediato di tutti i risultati per garantire isolamento assoluto tra domini diversi
+    resetResults();
+    securitySuite.resetResults();
+    vulnerabilitySuite.resetResults();
+
+    // Esecuzione coordinata di tutti i vettori diagnostici (Rete, Security Audit e Vulnerabilità)
+    await Promise.allSettled([
+      runAll(clean),
+      securitySuite.runAll(clean),
+      vulnerabilitySuite.runAll(clean),
+    ]);
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchInput.trim()) {
-      const clean = searchInput.trim().toLowerCase().replace(/^https?:\/\//, '');
-      setTarget(clean);
-      runAll(clean);
+      runComprehensiveScan(searchInput);
     }
   };
 
@@ -311,18 +334,29 @@ export default function Dashboard() {
             {activeSection === 'external' ? (
               <button
                 type="submit"
-                disabled={activeCount > 0}
+                disabled={isGlobalScanning}
                 className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-4 text-[0.875rem] font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-60"
               >
-                {activeCount > 0 && <RefreshCw className="size-4 animate-spin" aria-hidden="true" />}
-                {activeCount > 0 ? `In esecuzione (${activeCount})…` : `Esegui tutti (${totalTests})`}
+                {isGlobalScanning && <RefreshCw className="size-4 animate-spin" aria-hidden="true" />}
+                {isGlobalScanning ? `In esecuzione…` : `Esegui tutti (${totalTests})`}
               </button>
             ) : (
               <button
                 type="submit"
-                className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-surface px-4 text-[0.875rem] font-semibold text-foreground hover:bg-surface-alt"
+                disabled={isGlobalScanning}
+                className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md bg-accent px-4 text-[0.875rem] font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-60"
               >
-                Imposta dominio
+                {isGlobalScanning ? (
+                  <>
+                    <RefreshCw className="size-4 animate-spin" aria-hidden="true" />
+                    Analisi in corso…
+                  </>
+                ) : (
+                  <>
+                    <Play className="size-4 fill-current" aria-hidden="true" />
+                    Avvia audit completo
+                  </>
+                )}
               </button>
             )}
           </form>
@@ -344,6 +378,11 @@ export default function Dashboard() {
             target={target} 
             perspectiveMode={perspectiveMode} 
             onOpenExportModal={() => setReportModalOpen(true)}
+            results={results}
+            internalResults={internalSuite.results}
+            securityResults={securitySuite.results}
+            vulnerabilityResults={vulnerabilitySuite.results}
+            pentestResults={pentestSuite.data}
           />
         )}
 
@@ -618,7 +657,7 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {activeSection === 'security' && (
           <div className="bg-[#090d16] border border-[#1c2940] rounded-md p-4">
-            <SecurityAudit target={target} />
+            <SecurityAudit target={target} suite={securitySuite} />
           </div>
         )}
 
@@ -627,7 +666,7 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {activeSection === 'vulnerabilities' && (
           <div className="bg-[#090d16] border border-[#1c2940] rounded-md p-4">
-            <VulnerabilityScan target={target} />
+            <VulnerabilityScan target={target} suite={vulnerabilitySuite} />
           </div>
         )}
 

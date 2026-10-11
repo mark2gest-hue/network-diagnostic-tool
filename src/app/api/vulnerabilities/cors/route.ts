@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { targetSchema, formatZodError } from '@/lib/validators';
+import { safeHttpProbe } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,22 +19,23 @@ export async function GET(req: Request) {
 
   try {
     const testOrigin = 'https://evil-attacker-website.com';
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const res = await fetch(baseUrl, {
+    const res = await safeHttpProbe(baseUrl, {
       method: 'GET',
       headers: {
         'Origin': testOrigin,
         'Access-Control-Request-Method': 'GET'
       },
-      signal: controller.signal
+      timeout: 5000,
     });
-    clearTimeout(timeout);
 
-    const allowOrigin = res.headers.get('access-control-allow-origin');
-    const allowCredentials = res.headers.get('access-control-allow-credentials');
-    const allowMethods = res.headers.get('access-control-allow-methods');
+    const getHeader = (name: string) => {
+      const val = res.headers[name.toLowerCase()];
+      return Array.isArray(val) ? val[0] : val;
+    };
+
+    const allowOrigin = getHeader('access-control-allow-origin');
+    const allowCredentials = getHeader('access-control-allow-credentials');
+    const allowMethods = getHeader('access-control-allow-methods');
 
     let status: 'pass' | 'warning' | 'fail' = 'pass';
     let riskLevel = 'Basso / Sicuro';
@@ -70,7 +72,8 @@ export async function GET(req: Request) {
         ? 'Nessuna azione necessaria. CORS protetto.'
         : 'Restringi la whitelist dei domini permessi in Access-Control-Allow-Origin a soli host fidati.'
     });
-  } catch {
-    return NextResponse.json({ error: 'Verifica policy CORS fallita' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = (err as Error)?.message || 'Errore sconosciuto';
+    return NextResponse.json({ error: `Verifica policy CORS fallita: ${msg}` }, { status: 500 });
   }
 }

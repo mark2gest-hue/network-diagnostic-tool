@@ -1,8 +1,11 @@
-export type FindingCategory = 'availability' | 'configuration' | 'security';
+export type FindingCategory = 'availability' | 'configuration' | 'security' | 'governance';
 
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 export type FindingStatus = 'open' | 'confirmed' | 'risk_accepted' | 'false_positive';
+
+// Re-export dei tipi unificati di assessment
+export * from './assessment';
 
 export interface TechnicalEvidence {
   host: string;
@@ -66,12 +69,23 @@ export interface ScoreBreakdown {
   formulaExplanation: string;
 }
 
+export interface AssessmentCoverage {
+  totalModules: number;
+  completedModules: number;
+  inconclusiveModules: number;
+  errorModules: number;
+  coveragePercentage: number;
+  isCoverageSufficient: boolean; // false se troppi test falliti/saltati
+  caveatNotes?: string;
+}
+
 export interface RiskAssessment {
   overallScore: number; // 0 - 100 (100 = postura eccellente)
   grade: SecurityGrade;
   summary: string;
+  coverage?: AssessmentCoverage;
   breakdown: ScoreBreakdown;
-  pillars: Record<FindingCategory, PillarScore>;
+  pillars: Partial<Record<FindingCategory, PillarScore>> & Record<'availability' | 'configuration' | 'security', PillarScore>;
   findings: Finding[];
   deductions: {
     rule: string;

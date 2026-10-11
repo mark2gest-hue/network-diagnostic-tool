@@ -14,11 +14,14 @@ import { ResultRenderer } from './ResultRenderer';
 
 interface SecurityAuditProps {
   target?: string;
+  suite?: ReturnType<typeof useSecurityAudit>;
 }
 
-export function SecurityAudit({ target: initialTarget = 'aiutiamoci.cloud' }: SecurityAuditProps) {
+export function SecurityAudit({ target: initialTarget = 'aiutiamoci.cloud', suite }: SecurityAuditProps) {
   const [target, setTarget] = useState(initialTarget);
-  const { results, loading, overallScore, runAll, generatePDF } = useSecurityAudit();
+  const localSuite = useSecurityAudit();
+  const activeSuite = suite || localSuite;
+  const { results, loading, overallScore, runAll, generatePDF } = activeSuite;
 
   React.useEffect(() => {
     if (initialTarget) {
@@ -32,9 +35,12 @@ export function SecurityAudit({ target: initialTarget = 'aiutiamoci.cloud' }: Se
     if (isLoading) return <StatusPill tone="pending">In corso</StatusPill>;
     if (!test || test.status === 'idle') return <StatusPill tone="pending">In attesa</StatusPill>;
     const s = String(test.status).toLowerCase();
+    if (s === 'error') return <StatusPill tone="skipped">Errore scan</StatusPill>;
+    if (s === 'inconclusive' || s === 'skipped') return <StatusPill tone="skipped">Non conclusivo</StatusPill>;
     if (['pass', 'success', 'ok'].includes(s)) return <StatusPill tone="ok">Superato</StatusPill>;
     if (['warn', 'warning', 'attention'].includes(s)) return <StatusPill tone="warn">Attenzione</StatusPill>;
-    return <StatusPill tone="crit">Critico</StatusPill>;
+    if (['fail', 'critical', 'crit'].includes(s)) return <StatusPill tone="crit">Critico</StatusPill>;
+    return <StatusPill tone="neutral">{test.status}</StatusPill>;
   };
 
   return (

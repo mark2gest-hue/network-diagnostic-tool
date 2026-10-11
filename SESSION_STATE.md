@@ -45,7 +45,25 @@
 - [x] Esportazione PDF 1-Click sincronizzata: pulsante rapido integrato in Vulnerability Scanner e tabelle PDF ampliate con dettagli su leak e file esposti
 - [x] Bufferbloat & Loaded Latency Test: misurazione latenza sotto carico (Download/Upload burst) nello Speedtest con assegnazione rating (Grado A+, A, B, C, F)
 - [x] Modulo "Integrità DNS & Path MTU" (`/api/lan/network-integrity`): rilevamento trasparente di DNS Hijacking/Poisoning rispetto ai resolver Anycast e stima MTU 1500 / TCP MSS 1460
-- [x] Typecheck e Sentinel Check verificati con successo (0 errori)
+- [x] Overhaul Metodologico Assessment Engine & Eliminazione Falsi Positivi/Mockup Report:
+  - Modello Unificato dei Risultati (`src/types/assessment.ts`): separazione rigorosa tra executionStatus, securityOutcome, severity e confidence nullable.
+  - Normalizzazione Target & Scope Engine (`target-normalizer.ts` & `scope-engine.ts`): parsing esatto scheme/port/path/IP, prevenzione scope drift su CDN e subnet LAN esplicite.
+  - De-escalation sonde: AI Scraper Governance spostato a policy informativa (`governance`), User-Agent script declassato, rimozione verdetti assoluti "PROTETTO" su SSRF e Request Smuggling.
+  - Motore TLS & RBL: distinzione tra timeout/unreachable porta 443 e certificato scaduto; gestione corretta di MX senza record A e provider email condivisi.
+  - Risk Engine: calcolo della Copertura Esecutiva (% test completati) disgiunto dallo score di postura; neutralizzazione detrazioni su test inconclusivi/errori tecnici.
+  - Report PDF (`ExportReportModal.tsx`): rimossi tutti i placeholder/mockup hardcodati; tabelle con overflow linebreak espandibili (zero testo troncato); bonifiche 100% finding-driven.
+- [x] Fase 2 — Targeted Validation Engine, Evidence Sanitizer & Dynamic Executive Overhaul:
+  - `src/lib/evidence-sanitizer.ts`: Anonimizzazione automatica di segreti, token Bearer/JWT, chiavi OpenAI/AWS, cookie di sessione e password prima di qualsiasi log o PDF.
+  - `src/lib/targeted-validation-engine.ts`: Motore di approfondimento selettivo non distruttivo con budget (max 10-15 req), delay controllato e condizioni di stop automatico (latenza > 2500ms o 5xx ripetuti).
+  - Fingerprinting Anti-SPA: algoritmo di comparazione euristica/baseline con la risposta 404 per azzerare i falsi positivi da Single Page Application (es. React/Vue router che risponde 200 OK su `/.env`).
+  - Endpoint API `/api/pentest/targeted-validate`: trigger per esecuzione mirata condizionale.
+  - UI HUD (`PentestSection.tsx`): pulsante interattivo "Esegui validazione mirata" per verificare empiricamente i finding segnalati senza rieseguire l'intera suite.
+  - `ExecutiveRemediationSummary.tsx`: eliminati tutti i punteggi fissi (`70/100`, `92/100`) e la lista finta di correzioni. L'intero riepilogo esecutivo, le 3 azioni prioritarie per il team IT, lo stato per area aziendale e i comandi di bonifica sono ora alimentati in tempo reale dai risultati di scansione tramite `extractFindingsFromResults` e `calculateRiskAssessment`.
+  - Eliminato falso positivo su file sensibili: rimosso categoricamente `/robots.txt` dall'elenco `SENSITIVE_FILES`. Solo file con effettivo rischio (es. `.env`, `.git`, dump database, chiavi private) possono innescare finding o tabelle di bonifica.
+  - Risoluzione DNS Autoritativa Diretta (`dns-authoritative.ts`): bypass totale della cache TTL dei resolver intermedi (Google/ISP) su DMARC e SPF.
+  - Isolamento Assoluto tra Target & Hard Reset: implementato `resetResults()` sincrono su `useExternalTests`, `useSecurityAudit`, `useVulnerabilityScan` e invocato in `page.tsx` ad ogni nuova scansione; azzerato il merge parziale di vecchi payload su stati `running` ed `error`.
+  - Sonda HTTP Resiliente (`safeHttpProbe.ts`): gestione nativa di catene SSL incomplete/self-signed senza crash 500 su verifiche web esterne (CORS, Cookie).
+  - Correzione Semafori UI: gli errori tecnici di rete o handshake vengono visualizzati come `Errore scan` (grigio/neutro) e non più declassati a falsi `Critico`.
 
 ### In corso (In Progress)
 - [ ] Monitoraggio continuo e rifiniture di produzione

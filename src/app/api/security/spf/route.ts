@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import dns from 'dns/promises';
 import { domainSchema, formatZodError } from '@/lib/validators';
+import { resolveAuthoritativeTxt } from '@/lib/dns-authoritative';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,16 +16,31 @@ export async function GET(req: Request) {
 
   try {
     const validatedDomain = validation.data;
-    const txtRecords = await dns.resolveTxt(validatedDomain);
-    const spfRecord = txtRecords.flat().find(r => r.startsWith('v=spf1'));
+    const txtRecords = await resolveAuthoritativeTxt(validatedDomain, validatedDomain);
+    const spfRecords = txtRecords
+      .map(chunks => chunks.join(''))
+      .filter(r => r.startsWith('v=spf1'));
 
-    if (!spfRecord) {
+    if (spfRecords.length === 0) {
       return NextResponse.json({
         status: 'fail',
         message: 'Record SPF mancante',
         recommendation: 'Configura un record SPF per prevenire lo spoofing delle email.'
       });
     }
+
+    if (spfRecords.length > 1) {
+      return NextResponse.json({
+        status: 'fail',
+        records: spfRecords,
+        record: spfRecords[0],
+        multipleRecordsFound: true,
+        message: `Rilevati record SPF multipli (${spfRecords.length} record in DNS)`,
+        recommendation: 'RFC 7208 Sezione 3.2: un dominio non deve mai pubblicare più di un record SPF (condizione PermError). I mail server riceventi scartano o bocciano la validazione SPF. Rimuovere i record duplicati.'
+      });
+    }
+
+    const spfRecord = spfRecords[0];
 
     const isPermissive = spfRecord.includes('+all');
     const isNeutral = spfRecord.includes('?all');
