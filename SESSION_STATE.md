@@ -64,6 +64,26 @@
   - Isolamento Assoluto tra Target & Hard Reset: implementato `resetResults()` sincrono su `useExternalTests`, `useSecurityAudit`, `useVulnerabilityScan` e invocato in `page.tsx` ad ogni nuova scansione; azzerato il merge parziale di vecchi payload su stati `running` ed `error`.
   - Sonda HTTP Resiliente (`safeHttpProbe.ts`): gestione nativa di catene SSL incomplete/self-signed senza crash 500 su verifiche web esterne (CORS, Cookie).
   - Correzione Semafori UI: gli errori tecnici di rete o handshake vengono visualizzati come `Errore scan` (grigio/neutro) e non più declassati a falsi `Critico`.
+- [x] Pacchetto 1 — Web Hygiene, Exposure & Takeover Reale (Zero Falsi Positivi / 100% Empirico):
+  - **Directory Listing Passivo (CWE-548)**: Nuovo endpoint `/api/vulnerabilities/directory-listing` con firme univoche autoindex (Apache, Nginx, IIS) e scarto deterministico di router SPA/404 generici.
+  - **Information Disclosure & Software EOL (CWE-200)**: Estrazione esatta dei banner `Server`, `X-Powered-By`, `X-AspNet-Version` con rilevamento di rami End-of-Life non supportati (PHP 5/7, Apache legacy, Python 2) e comandi `curl` di verifica.
+  - **Subdomain Takeover Ampliato a 17 Provider Cloud**: Pattern e firme verificate (AWS S3, GitHub Pages, Heroku, Azure, Shopify, Zendesk, Fastly, Surge, Readme.io, Webflow, Bitbucket, Fly.io, Unbounce, Ghost) con test dual-protocol HTTPS/HTTP e comando `curl` di riproduzione immediata.
+  - **Integrazione Risk Engine & PDF**: Finding-driven su Executive Remediation Summary e tabella dedicata nel report PDF esportabile.
+- [x] Pacchetto 2 — Deep Infrastructure, Email Chain & OCSP Revocation:
+  - **MX STARTTLS & Mail Server Cert Probe (porta 25 passiva)**: Sonda socket SMTP su server MX primario (EHLO + STARTTLS + handshake TLS) con estrazione certificato (issuer, valid_to, days_remaining) e gestione anti-hang / graceful fallback su firewall egress.
+  - **DANE / TLSA (RFC 6698)**: Query automatica record TLSA su `_25._tcp.<mx>` con verificabilità diretta via comando `dig`.
+  - **Dangling MX Record (Mail Hijacking)**: Rilevamento di record MX che puntano a host non registrati/non risolti (CWE-673) con alert critico e remediation immediata.
+  - **OCSP Stapling & Revocation**: Verifica estensione `requestOCSP` durante handshake TLS su porta 443 ed estrazione automatica dell'URL dell'OCSP Responder dalla catena del certificato.
+
+ - [x] Audit tecnico read-only (report in brain/cc66af71.../audit_tecnico_network_diagnostic.md) + Step 1 modalità `APP_MODE` local/demo:
+   - Scansioni solo in locale (`npm run dev` bind 127.0.0.1:3004). VPS = demo: default `demo` se `NODE_ENV=production` (override `APP_MODE` / `NEXT_PUBLIC_APP_MODE`).
+   - `middleware.ts`: in demo le route `/api/tests|security|vulnerabilities|pentest|lan|ai|active-defense` → 403; pagine non-API → redirect `/login` senza sessione JWT.
+   - UI demo: `page.tsx` + `DemoScenarioSelector` (prop `hideLiveSwitch`) + `ExecutiveRemediationSummary` (prop `demoAssessment`); solo tab Riepilogo/Manuale, dati etichettati SIMULAZIONE DEMO.
+   - Verificato: `tsc` OK; curl demo: `/`→307 login, `/login` 200, scan 403, history 401; local: `/` 200, scan 200.
+   - Step 2 (output finti rimossi): `active-defense` (niente claim mitigazione, fallisce senza canale), `webhooks` test_notification (POST reale + esito vero), `lan/scan` (gateway da routing, subnet da netmask, porte/latenza solo misurate), `ai/analyze` (400 senza riskAssessment, niente 85/B), client Modal/LanScanner/WebhookManager allineati. `tsc` OK; curl: lan/scan reale, ai/analyze 400.
+   - Step 3 (parziale): chiave `emailArmor` in risk-engine; email-armor: probe MX/NS solo su IP pubblici (`hostIsPublic`), Dangling MX solo NXDOMAIN (null-MX escluso), DANE richiede TLSA(type 52)+AD, nessun punteggio per controlli non eseguiti (porta 25 filtrata, AXFR saltato, `scoreNote`); OCSP rinominato "Stapling / Responder" e assenza = info. `tsc` OK, curl aiutiamoci.cloud OK.
+   - Step 3b `pentest/run`: smuggling → 'skipped' (fetch non invia TE+CL, nessun verdetto), takeover solo NXDOMAIN (altri errori 'skipped'), probe 3/9/13 'skipped' se host irraggiungibile, match regex specifici (.env, .git, actuator, _cat, traefik). `tsc` OK; live aiutiamoci.cloud: 12 passed, 1 skipped.
+   - Residuo: firme takeover deboli (subdomains), regola EOL ASP.NET + liste statiche, SSRF target in `pentest/run` (accettato: uso solo locale), probe 10 euristica a riflessione. Registrazione `/api/auth/register` aperta in demo (da restringere).
 
 ### In corso (In Progress)
 - [ ] Monitoraggio continuo e rifiniture di produzione
@@ -77,13 +97,17 @@
 
 | File | Operazione | Impatto |
 | :--- | :--- | :--- |
-| [/api/security/leaks/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/security/leaks/route.ts) | Creazione | Motore di scansione Dark Web e breach account su database HIBP e COMB (3.2B records) |
-| [/api/vulnerabilities/files/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/vulnerabilities/files/route.ts) | Modifica | Espansione a 22 percorsi sensibili (.git, .env, docker, sql dump, id_rsa, wp users) |
-| [useSecurityAudit.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/hooks/useSecurityAudit.ts) | Modifica | Aggancio del test Leaks nella suite completa di sicurezza |
-| [SecurityAudit.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/SecurityAudit.tsx) | Modifica | Nuova card interattiva "DeepWeb & Credential Leaks" con conteggio totale su 12 test |
-| [VulnerabilityScan.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/VulnerabilityScan.tsx) | Modifica | Pulsante rapido "Scarica PDF" integrato nella barra comandi con modal 1-click |
-| [ResultRenderer.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ResultRenderer.tsx) | Modifica | Rendering dedicato semaforico per Dark Web Leaks e credenziali anonimizzate |
-| [ExportReportModal.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ExportReportModal.tsx) | Modifica | Dettagli arricchiti nel report PDF esportato per leak credenziali e file sensibili |
+| [/api/security/email-armor/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/security/email-armor/route.ts) | Modifica | Aggiunti MX STARTTLS probe porta 25, DANE TLSA e Dangling MX check |
+| [/api/tests/ssl/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/tests/ssl/route.ts) | Modifica | Aggiunto supporto OCSP Stapling (requestOCSP) e OCSP responder URL extraction |
+| [/api/vulnerabilities/directory-listing/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/vulnerabilities/directory-listing/route.ts) | Creazione | Rilevamento empirico autoindex su 10 directory con firme web server reali |
+| [/api/security/headers/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/security/headers/route.ts) | Modifica | Aggiunta analisi Information Disclosure, software EOL e fallback safeHttpProbe |
+| [/api/tests/subdomains/route.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/app/api/tests/subdomains/route.ts) | Modifica | Espansione a 17 provider cloud con firme verificate, dual probe e comando curl |
+| [useVulnerabilityScan.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/hooks/useVulnerabilityScan.ts) | Modifica | Aggancio test directory-listing con pesatura di rischio dedicata |
+| [VulnerabilityScan.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/VulnerabilityScan.tsx) | Modifica | Nuova riga espandibile per Directory Listing con conteggio su 8 test |
+| [ResultRenderer.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ResultRenderer.tsx) | Modifica | Rendering dedicato per Directory Listing, STARTTLS, DANE, Dangling MX e OCSP |
+| [risk-engine.ts](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/lib/risk-engine.ts) | Modifica | Findings automatici per Directory Listing, EOL software, Dangling MX e STARTTLS |
+| [ExportReportModal.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/ExportReportModal.tsx) | Modifica | Inclusione Directory Listing, STARTTLS, DANE e OCSP nel PDF esportabile |
+| [SubdomainHunterCard.tsx](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/src/components/dashboard/SubdomainHunterCard.tsx) | Modifica | Visualizzazione comando curl per verifica empirica dei takeover rilevati |
 
 ---
 
