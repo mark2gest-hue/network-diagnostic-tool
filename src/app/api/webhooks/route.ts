@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, name, url, provider = 'slack', target, driftData } = body;
+    const { action, name, url, provider = 'slack', target } = body;
 
     // Se è un test di invio notifica
     if (action === 'test_notification') {
@@ -53,21 +53,28 @@ export async function POST(req: Request) {
       if (!webhookUrl) {
         return NextResponse.json({ error: 'URL webhook mancante' }, { status: 400 });
       }
+      if (!/^https:\/\//i.test(webhookUrl)) {
+        return NextResponse.json({ error: 'URL webhook non valido: richiesto https://' }, { status: 400 });
+      }
 
-      const payload = {
-        title: `🚨 [SECURITY ALERT] Attack Surface Drift Rilevato`,
-        target: target || 'shop.fashion-global.com',
-        timestamp: new Date().toISOString(),
-        scoreDelta: driftData?.scoreDelta ?? -63,
-        details: driftData?.summary || 'Rilevate nuove porte aperte (6379) e file sensibili esposti (.env).',
-        actionRequired: 'Verificare immediatamente la configurazione firewall del cluster.',
-      };
+      const text = `🔔 Test notifica NetworkDiag Ops Pro${target ? ` — target: ${target}` : ''} (${new Date().toISOString()})`;
+      const body =
+        provider === 'discord' ? { content: text } : provider === 'generic' ? { title: 'Test notifica NetworkDiag', target, timestamp: new Date().toISOString() } : { text };
 
-      return NextResponse.json({
-        success: true,
-        message: `Notifica di simulazione ${provider.toUpperCase()} inviata con successo`,
-        dispatchedPayload: payload,
-      });
+      try {
+        const hookRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!hookRes.ok) {
+          return NextResponse.json({ success: false, message: `Il webhook ha risposto HTTP ${hookRes.status}` }, { status: 502 });
+        }
+        return NextResponse.json({ success: true, message: `Notifica di test ${provider.toUpperCase()} inviata (HTTP ${hookRes.status})` });
+      } catch (err) {
+        return NextResponse.json({ success: false, message: `Webhook non raggiungibile: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
+      }
     }
 
     // Altrimenti è creazione di un webhook config

@@ -83,18 +83,16 @@ export const WebhookManagerModal: React.FC<WebhookManagerModalProps> = ({
           url: webhookUrl,
           provider,
           target,
-          driftData: {
-            scoreDelta: -63,
-            summary: 'Rilevata nuova porta Redis 6379 esposta e file .env leakato!',
-          },
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         setTestStatus(`✓ ${data.message}`);
-        setTimeout(() => setTestStatus(null), 4000);
+      } else {
+        setTestStatus(`✗ ${data.message || data.error || 'Invio fallito'}`);
       }
+      setTimeout(() => setTestStatus(null), 4000);
     } catch {
       setTestStatus('Errore invio notifica');
     }

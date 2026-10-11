@@ -17,7 +17,7 @@ export async function POST(req: Request) {
         ? `🚨 *[SENTINEL - PANIC MODE ATTIVATO]*\n\n` +
           `🎯 *Target:* \`${target}\`\n` +
           `⏱ *Orario:* ${new Date().toLocaleString('it-IT')}\n` +
-          `⚡ *Azione Eseguita:* Mitigazione Under Attack forzata. Filtraggio connessioni non autorizzate e blocco preventivo botnet.\n\n` +
+          `⚠️ *Nota:* segnalazione manuale dell'operatore. Nessuna mitigazione automatica eseguita da questo strumento.\n\n` +
           `_Generato da NetworkDiag Ops Pro Sentinel_`
         : `🔔 *[SENTINEL SECURITY ALERT]*\n\n` +
           `🎯 *Target Monitorato:* \`${target}\`\n` +
@@ -65,14 +65,16 @@ export async function POST(req: Request) {
         }
       }
 
-      // Se le credenziali non sono ancora impostate, restituiamo simulazione positiva
-      return NextResponse.json({
-        success: true,
-        dispatchedToTelegram: false,
-        message: 'Alert simulato con successo in console (configura Chat ID e Bot Token per riceverlo sul telefono)',
-        action,
-        target,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          dispatchedToTelegram: false,
+          message: 'Nessun canale Telegram configurato (Chat ID e Bot Token mancanti): nessun avviso inviato',
+          action,
+          target,
+        },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ error: 'Azione non riconosciuta' }, { status: 400 });

@@ -13,8 +13,11 @@ export async function POST(req: Request) {
 
     const targetHost = target || 'Target non specificato';
     const activeFindings = findings || riskAssessment?.findings || [];
-    const overallScore = riskAssessment?.overallScore ?? 85;
-    const grade = riskAssessment?.grade ?? 'B';
+    if (!riskAssessment) {
+      return NextResponse.json({ error: 'riskAssessment mancante: eseguire prima una scansione' }, { status: 400 });
+    }
+    const overallScore = riskAssessment.overallScore;
+    const grade = riskAssessment.grade;
 
     // Generazione del report di sintesi e remediation basato sui finding deterministici
     const criticalFindings = activeFindings.filter((f) => f.severity === 'critical');

@@ -67,8 +67,8 @@ export function LanScanner() {
       `"${d.role}"`,
       d.isGateway ? 'SI' : 'NO',
       d.isSelf ? 'SI' : 'NO',
-      `"${d.openPorts.join(', ') || 'Nessuna'}"`,
-      d.latency ?? 0
+      `"${d.openPorts.join(', ') || (d.isGateway ? 'Nessuna tra 80/443' : 'Non sondate')}"`,
+      d.latency ?? ''
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -199,8 +199,8 @@ export function LanScanner() {
                   }
                 >
                   <div className="text-xs space-y-1 font-mono text-ink-2">
-                    <p>• Porte aperte: {dev.openPorts.join(', ') || 'Nessuna porta standard aperta'}</p>
-                    <p>• Latenza stimata: {dev.latency ?? 0} ms</p>
+                    <p>• Porte aperte: {dev.openPorts.join(', ') || (dev.isGateway ? 'Nessuna tra 80/443' : 'Non sondate')}</p>
+                    <p>• Latenza: {dev.latency !== undefined ? `${dev.latency} ms` : 'non misurata'}</p>
                   </div>
                 </ExpandableRow>
               );

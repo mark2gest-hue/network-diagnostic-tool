@@ -38,7 +38,6 @@ export function ActiveDefenseModal({ target, isOpen, onClose }: ActiveDefenseMod
           target,
           chatId: telegramChatId,
           botToken: telegramToken,
-          details: 'Audit diagnostico completato. Nessuna anomalia critica non gestita.',
         }),
       });
       const data = await res.json();

@@ -71,6 +71,25 @@ async function getArpTable(): Promise<Map<string, string>> {
   return arpMap;
 }
 
+// Gateway di default reale dalla tabella di routing del sistema (macOS / Linux)
+async function getDefaultGateway(): Promise<string | null> {
+  try {
+    if (process.platform === 'darwin') {
+      const { stdout } = await execAsync('route -n get default');
+      return stdout.match(/gateway:\s*((?:[0-9]{1,3}\.){3}[0-9]{1,3})/)?.[1] ?? null;
+    }
+    if (process.platform === 'linux') {
+      const { stdout } = await execAsync('ip route show default');
+      return stdout.match(/default via ((?:[0-9]{1,3}\.){3}[0-9]{1,3})/)?.[1] ?? null;
+    }
+  } catch {
+    // comando non disponibile: gateway non rilevabile
+  }
+  return null;
+}
+
+const ipToInt = (ip: string) => ip.split('.').reduce((acc, o) => (acc << 8) + Number(o), 0) >>> 0;
+
 export async function GET() {
   // In modalità locale o audit sul campo la scansione ARP/LAN legge l'interfaccia di rete host attiva
   try {
@@ -105,75 +124,74 @@ export async function GET() {
     }
 
     const selfIp = primaryInterface.ip;
-    const ipParts = selfIp.split('.').map(Number);
-    const baseSubnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-    const gatewayIp = `${baseSubnet}.1`;
+    const maskInt = ipToInt(primaryInterface.netmask);
+    const cidr = primaryInterface.netmask.split('.').reduce((n, o) => n + Number(o).toString(2).replace(/0/g, '').length, 0);
+    const networkInt = (ipToInt(selfIp) & maskInt) >>> 0;
+    const inSubnet = (ip: string) => ((ipToInt(ip) & maskInt) >>> 0) === networkInt;
+    const networkAddr = [24, 16, 8, 0].map((s) => (networkInt >>> s) & 255).join('.');
+
+    const gatewayIp = await getDefaultGateway();
 
     // 1. Lettura passiva e sicura della tabella ARP (senza scansioni invasive a ventaglio)
     const arpTable = await getArpTable();
 
-    // 2. Controllo porta gateway rapido e non invasivo
-    const gwProbe = await probePort(gatewayIp, 80, 200);
-    const isGwReachable = gwProbe.open || arpTable.has(gatewayIp);
-
-    const updatedArp = arpTable;
+    // 2. Probe reale (porte 80/443) solo sul gateway rilevato
+    const gwOpenPorts: number[] = [];
+    let gwLatency: number | undefined;
+    if (gatewayIp) {
+      for (const port of [80, 443]) {
+        const probe = await probePort(gatewayIp, port, 300);
+        if (probe.open) {
+          gwOpenPorts.push(port);
+          gwLatency = gwLatency === undefined ? probe.latency : Math.min(gwLatency, probe.latency);
+        }
+      }
+    }
 
     const devices: DiscoveredDevice[] = [];
 
-    // Aggiungiamo te stesso
     devices.push({
       ip: selfIp,
       mac: primaryInterface.mac || 'N/A',
       role: 'Questo Computer (Host)',
       isGateway: false,
       isSelf: true,
-      openPorts: [3000],
-      latency: 0
+      openPorts: [],
     });
 
-    // Aggiungiamo il Gateway se presente o raggiungibile
-    if (updatedArp.has(gatewayIp) || isGwReachable) {
+    if (gatewayIp && gatewayIp !== selfIp) {
       devices.push({
         ip: gatewayIp,
-        mac: updatedArp.get(gatewayIp) || 'N/A',
-        role: 'Router / Gateway WiFi',
+        mac: arpTable.get(gatewayIp) || 'N/A',
+        role: 'Gateway di default (tabella di routing)',
         isGateway: true,
         isSelf: false,
-        openPorts: [80, 443],
-        latency: 1
+        openPorts: gwOpenPorts,
+        latency: gwLatency,
       });
     }
 
-    // Aggiungiamo gli altri dispositivi rilevati in ARP
-    updatedArp.forEach((mac, ip) => {
-      if (ip !== selfIp && ip !== gatewayIp && ip.startsWith(baseSubnet)) {
-        let role = 'Dispositivo Connesso (Smartphone / PC / IoT)';
-        if (ip.endsWith('.254') || ip.endsWith('.2')) role = 'Access Point / Ripetitore';
-        else if (ip.endsWith('.200') || ip.endsWith('.250')) role = 'Stampante / Smart TV';
-
+    // Altri host presenti in tabella ARP nella stessa subnet (ruolo non determinabile senza fingerprinting)
+    arpTable.forEach((mac, ip) => {
+      if (ip !== selfIp && ip !== gatewayIp && inSubnet(ip)) {
         devices.push({
           ip,
           mac,
-          role,
+          role: 'Host in tabella ARP (ruolo non determinato)',
           isGateway: false,
           isSelf: false,
           openPorts: [],
-          latency: 2
         });
       }
     });
 
-    // Ordina per ultimo byte IP numerico
-    devices.sort((a, b) => {
-      const lastA = parseInt(a.ip.split('.').pop() || '0', 10);
-      const lastB = parseInt(b.ip.split('.').pop() || '0', 10);
-      return lastA - lastB;
-    });
+    // Ordina per indirizzo IP numerico
+    devices.sort((a, b) => ipToInt(a.ip) - ipToInt(b.ip));
 
     return NextResponse.json({
       interface: primaryInterface,
-      subnet: `${baseSubnet}.0/24`,
-      gatewayIp,
+      subnet: `${networkAddr}/${cidr}`,
+      gatewayIp: gatewayIp ?? 'non rilevato',
       devicesCount: devices.length,
       devices
     });
