@@ -16,6 +16,8 @@ import { ExecutiveRemediationSummary } from '@/components/dashboard/ExecutiveRem
 import { PentestSection } from '@/components/dashboard/PentestSection';
 import { ActiveDefenseModal } from '@/components/dashboard/ActiveDefenseModal';
 import { SubdomainHunterCard } from '@/components/dashboard/SubdomainHunterCard';
+import { DemoScenarioSelector } from '@/components/dashboard/DemoScenarioSelector';
+import { DEMO_SCENARIOS, DemoScenario } from '@/lib/demo-scenarios';
 import {
   Globe,
   ShieldCheck,
@@ -141,7 +143,12 @@ const MODULES: TestModuleDefinition[] = [
   },
 ];
 
+// Stesso default del middleware: demo in produzione, local altrimenti
+const IS_DEMO_MODE =
+  (process.env.NEXT_PUBLIC_APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
+
 export default function Dashboard() {
+  const [demoScenario, setDemoScenario] = useState<DemoScenario | null>(IS_DEMO_MODE ? DEMO_SCENARIOS.fintech_prod : null);
   const [activeSection, setActiveSection] = useState<MainSectionTab>('remediation');
   const [target, setTarget] = useState<string>('aiutiamoci.cloud');
   const [searchInput, setSearchInput] = useState<string>('aiutiamoci.cloud');
@@ -228,7 +235,7 @@ export default function Dashboard() {
     `flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.875rem] font-medium transition-colors ${
       active ? 'bg-accent-bg text-accent font-semibold' : 'text-ink-2 hover:bg-hover hover:text-foreground'
     }`;
-  const showDomainBar = activeSection === 'remediation' || activeSection === 'external' || activeSection === 'pentest' || activeSection === 'security' || activeSection === 'vulnerabilities';
+  const showDomainBar = !IS_DEMO_MODE && (activeSection === 'remediation' || activeSection === 'external' || activeSection === 'pentest' || activeSection === 'security' || activeSection === 'vulnerabilities');
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:flex">
@@ -246,7 +253,7 @@ export default function Dashboard() {
         </div>
 
         <nav aria-label="Sezioni" className="flex flex-wrap gap-1 px-3 py-2 lg:flex-col lg:flex-nowrap">
-          {navTabs.map((tab) => {
+          {navTabs.filter((tab) => !IS_DEMO_MODE || tab.id === 'remediation' || tab.id === 'manual').map((tab) => {
             const TabIcon = tab.icon;
             const isSelected = activeSection === tab.id;
             return (
@@ -306,10 +313,12 @@ export default function Dashboard() {
             </label>
           </div>
 
-          <button type="button" onClick={() => setShowActiveDefenseModal(true)} className={navItemCls(false)}>
-            <ShieldHalf className="size-4 shrink-0" aria-hidden="true" />
-            Sentinel
-          </button>
+          {!IS_DEMO_MODE && (
+            <button type="button" onClick={() => setShowActiveDefenseModal(true)} className={navItemCls(false)}>
+              <ShieldHalf className="size-4 shrink-0" aria-hidden="true" />
+              Sentinel
+            </button>
+          )}
           <Header />
         </div>
       </aside>
@@ -373,11 +382,19 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {/* TAB 0: EXECUTIVE SUMMARY & REMEDIATION PLAN */}
         {/* ========================================================================= */}
+        {activeSection === 'remediation' && IS_DEMO_MODE && (
+          <DemoScenarioSelector
+            activeScenarioId={demoScenario?.id ?? null}
+            onSelectScenario={setDemoScenario}
+            hideLiveSwitch
+          />
+        )}
         {activeSection === 'remediation' && (
           <ExecutiveRemediationSummary 
-            target={target} 
+            target={demoScenario ? demoScenario.asset.target : target} 
             perspectiveMode={perspectiveMode} 
-            onOpenExportModal={() => setReportModalOpen(true)}
+            onOpenExportModal={IS_DEMO_MODE ? undefined : () => setReportModalOpen(true)}
+            demoAssessment={demoScenario?.assessment}
             results={results}
             internalResults={internalSuite.results}
             securityResults={securitySuite.results}

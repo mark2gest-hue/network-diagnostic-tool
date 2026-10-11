@@ -7,11 +7,13 @@ import { Sparkles, ShieldCheck, Flame, Server, Globe } from 'lucide-react';
 interface DemoScenarioSelectorProps {
   activeScenarioId: string | null;
   onSelectScenario: (scenario: DemoScenario | null) => void;
+  hideLiveSwitch?: boolean;
 }
 
 export const DemoScenarioSelector: React.FC<DemoScenarioSelectorProps> = ({
   activeScenarioId,
   onSelectScenario,
+  hideLiveSwitch,
 }) => {
   return (
     <div className="w-full bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-xl mb-6">
@@ -39,7 +41,7 @@ export const DemoScenarioSelector: React.FC<DemoScenarioSelectorProps> = ({
           </div>
         )}
 
-        {activeScenarioId && (
+        {activeScenarioId && !hideLiveSwitch && (
           <button
             onClick={() => onSelectScenario(null)}
             className="text-xs text-indigo-300 hover:text-white underline font-mono flex items-center gap-1.5 bg-indigo-950/60 px-3 py-1 rounded-lg border border-indigo-500/30 transition-all hover:bg-indigo-900"

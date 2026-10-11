@@ -12,11 +12,13 @@ import autoTable from 'jspdf-autotable';
 import { Button } from '@/components/ui/button';
 import { BigScore, ActionCard, StatusPill, RowList, ExpandableRow, CommandBlock } from '@/components/ui/nd';
 import { extractFindingsFromResults, calculateRiskAssessment } from '@/lib/risk-engine';
+import type { RiskAssessment } from '@/types/findings';
 
 export interface ExecutiveRemediationSummaryProps {
   target: string;
   perspectiveMode?: 'executive' | 'it-pro';
   onOpenExportModal?: () => void;
+  demoAssessment?: RiskAssessment;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   results?: Record<string, any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,6 +49,7 @@ export function ExecutiveRemediationSummary({
   target, 
   perspectiveMode = 'executive',
   onOpenExportModal,
+  demoAssessment,
   results,
   internalResults,
   securityResults,
@@ -75,15 +78,16 @@ export function ExecutiveRemediationSummary({
 
   // Estrazione deterministica dei finding e calcolo della postura di rischio
   const findings = React.useMemo(() => {
-    return extractFindingsFromResults(consolidatedRaw);
-  }, [consolidatedRaw]);
+    return demoAssessment ? demoAssessment.findings : extractFindingsFromResults(consolidatedRaw);
+  }, [consolidatedRaw, demoAssessment]);
 
   const assessment = React.useMemo(() => {
-    return calculateRiskAssessment(findings, consolidatedRaw);
-  }, [findings, consolidatedRaw]);
+    return demoAssessment ?? calculateRiskAssessment(findings, consolidatedRaw);
+  }, [findings, consolidatedRaw, demoAssessment]);
 
   // Rileva se almeno un test ha completato l'esecuzione
   const hasExecutedTests = React.useMemo(() => {
+    if (demoAssessment) return true;
     const rawEntries = Object.values(results || {}).filter(
       (r) => r && r.status !== 'idle' && r.status !== 'running'
     );
@@ -99,7 +103,7 @@ export function ExecutiveRemediationSummary({
           (Array.isArray(pentestResults) && pentestResults.length > 0))
     );
     return rawEntries.length > 0 || secEntries.length > 0 || vulnEntries.length > 0 || hasPentest;
-  }, [results, securityResults, vulnerabilityResults, pentestResults]);
+  }, [results, securityResults, vulnerabilityResults, pentestResults, demoAssessment]);
 
   // Mappatura dinamica dei finding verso il piano di remediation
   const remediationList: RemediationItem[] = React.useMemo(() => {
