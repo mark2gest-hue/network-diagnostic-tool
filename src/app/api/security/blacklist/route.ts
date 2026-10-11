@@ -73,7 +73,11 @@ export async function GET(req: Request) {
       RBL_ZONES.map(async (zone) => {
         try {
           const query = `${reversedIp}.${zone}`;
-          await dns.resolve4(query);
+          const answers = await dns.resolve4(query);
+          // 127.255.255.x = codici di errore DNSBL (es. Spamhaus: query via resolver pubblico/aperto), NON un listing
+          if (answers.length > 0 && answers.every((a) => a.startsWith('127.255.255.'))) {
+            return { zone, listed: false, status: 'query_error', error: `RESOLVER_BLOCKED (${answers.join(',')})` };
+          }
           return { zone, listed: true, status: 'listed' };
         } catch (e: any) {
           if (e.code === 'ENOTFOUND' || e.code === 'ENODATA') {
@@ -100,9 +104,13 @@ export async function GET(req: Request) {
       details: blacklistResults,
       message: listedIn.length > 0 
         ? `L'indirizzo IP del server di posta (${mxIp} - ${mxHost}) è segnalato in ${listedIn.length} blacklist (${listedIn.join(', ')}).${isSharedProvider ? ' Nota: l\'infrastruttura appartiene a un provider condiviso.' : ''}` 
+        : hasErrors
+        ? `Il server MX (${mxHost} - ${mxIp}) non risulta presente nelle ${blacklistResults.filter(r => r.status === 'clean').length} blacklist verificate; ${blacklistResults.filter(r => r.status === 'query_error').map(r => r.zone).join(', ')} non verificabili (resolver bloccato o errore DNS: servirebbe un resolver ricorsivo proprio).`
         : `Il server MX (${mxHost} - ${mxIp}) non risulta presente nelle ${RBL_ZONES.length} blacklist consultate.`,
       recommendation: listedIn.length > 0 
         ? 'Controllare i log di invio del mail server e richiedere la procedura di delisting ai gestori delle blacklist segnalate.' 
+        : hasErrors
+        ? 'Alcune blacklist (es. Spamhaus) non sono verificabili da questo resolver: controllare manualmente su check.spamhaus.org o usare un resolver ricorsivo proprio.'
         : 'Postura reputazionale IP del server di posta ottimale.'
     });
   } catch (error: any) {

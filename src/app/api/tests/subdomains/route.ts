@@ -15,6 +15,8 @@ interface DiscoveredSubdomain {
   cname?: string;
   isTakeoverVulnerable: boolean;
   takeoverFingerprint?: string;
+  evidenceSnippet?: string;
+  curlCommand?: string;
   status: 'active' | 'unresolved' | 'vulnerable';
 }
 
@@ -23,10 +25,20 @@ const TAKEOVER_SERVICES: Array<{ domainPattern: RegExp; serviceName: string; sig
   { domainPattern: /\.github\.io$/i, serviceName: 'GitHub Pages', signature: "There isn't a GitHub Pages site here" },
   { domainPattern: /\.herokuapp\.com$/i, serviceName: 'Heroku App', signature: 'No such app' },
   { domainPattern: /\.azurewebsites\.net$/i, serviceName: 'Azure Web App', signature: '404 Web Site not found' },
+  { domainPattern: /\.cloudapp\.net$/i, serviceName: 'Azure CloudApp', signature: '404 Web Site not found' },
   { domainPattern: /\.myshopify\.com$/i, serviceName: 'Shopify Store', signature: 'Sorry, this shop is currently unavailable' },
   { domainPattern: /\.zendesk\.com$/i, serviceName: 'Zendesk Portal', signature: 'Help Center Closed' },
   { domainPattern: /\.pantheonsite\.io$/i, serviceName: 'Pantheon Hosting', signature: '404 error unknown site' },
   { domainPattern: /\.ghost\.io$/i, serviceName: 'Ghost CMS', signature: 'The thing you were looking for is no longer here' },
+  { domainPattern: /\.fastly\.net$/i, serviceName: 'Fastly CDN', signature: 'Fastly error: unknown domain' },
+  { domainPattern: /\.surge\.sh$/i, serviceName: 'Surge.sh', signature: 'project not found' },
+  { domainPattern: /\.readme\.io$/i, serviceName: 'Readme.io', signature: 'Project doesnt exist... yet!' },
+  { domainPattern: /\.webflow\.io$/i, serviceName: 'Webflow', signature: "The page you are looking for doesn't exist" },
+  { domainPattern: /\.bitbucket\.io$/i, serviceName: 'Bitbucket Cloud', signature: 'Repository not found' },
+  { domainPattern: /\.fly\.dev$/i, serviceName: 'Fly.io', signature: '404 Not Found' },
+  { domainPattern: /\.unbouncepages\.com$/i, serviceName: 'Unbounce Landing', signature: 'The requested URL was not found on this server' },
+  { domainPattern: /\.uservoice\.com$/i, serviceName: 'UserVoice Support', signature: 'This UserVoice subdomain is currently available' },
+  { domainPattern: /\.tumblr\.com$/i, serviceName: 'Tumblr', signature: "Whatever you were looking for doesn't seem to exist" }
 ];
 
 async function fetchCrtShSubdomains(domain: string): Promise<string[]> {
@@ -76,26 +88,31 @@ async function fetchCrtShSubdomains(domain: string): Promise<string[]> {
   }
 }
 
-async function checkTakeoverSignature(targetUrl: string, expectedSignature: string): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4000);
+async function checkTakeoverSignature(host: string, expectedSignature: string): Promise<boolean> {
+  // Prova prima HTTPS poi fallback su HTTP
+  for (const proto of ['https', 'http']) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
 
-  try {
-    const res = await fetch(targetUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SecurityAudit/1.0)',
-      },
-    });
-    clearTimeout(timeout);
-    const body = await res.text();
-    return body.includes(expectedSignature);
-  } catch {
-    clearTimeout(timeout);
-    return false;
+    try {
+      const res = await fetch(`${proto}://${host}`, {
+        method: 'GET',
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; SecurityAudit/1.0)',
+        },
+      });
+      clearTimeout(timeout);
+      const body = await res.text();
+      if (body.includes(expectedSignature)) {
+        return true;
+      }
+    } catch {
+      clearTimeout(timeout);
+    }
   }
+  return false;
 }
 
 export async function GET(req: Request) {
@@ -154,14 +171,19 @@ export async function GET(req: Request) {
         }
 
         // Verifica Takeover se il CNAME punta a servizi cloud noti
+        let evidenceSnippet: string | undefined;
+        let curlCommand: string | undefined;
+
         if (cname) {
           const matchedService = TAKEOVER_SERVICES.find((s) => s.domainPattern.test(cname!));
           if (matchedService) {
-            // Se non risolve IP o è un bucket orfano, probe HTTP per la signature
-            const isVulnerable = await checkTakeoverSignature(`http://${host}`, matchedService.signature);
+            // Se non risolve IP o è un bucket orfano, probe HTTP/S per la signature
+            const isVulnerable = await checkTakeoverSignature(host, matchedService.signature);
             if (isVulnerable) {
               isTakeoverVulnerable = true;
               takeoverFingerprint = `${matchedService.serviceName} (${matchedService.signature})`;
+              evidenceSnippet = matchedService.signature;
+              curlCommand = `curl -i -sS "http://${host}"`;
             }
           }
         }
@@ -179,6 +201,8 @@ export async function GET(req: Request) {
           cname,
           isTakeoverVulnerable,
           takeoverFingerprint,
+          evidenceSnippet,
+          curlCommand,
           status,
         };
       })

@@ -176,7 +176,8 @@ export function ExportReportModal({
           summaryDetail = `TTFB: ${t.ttfb ?? t.dns ?? '-'}ms | Latenza totale: ${t.total ?? '-'}ms`;
         } else if (key === 'ssl' && (payload.validTo || payload.daysRemaining !== undefined || payload.days_remaining !== undefined)) {
           const days = payload.days_remaining ?? payload.daysRemaining ?? 'N/A';
-          summaryDetail = `Certificato SSL/TLS valido (${days} giorni residui - Issuer: ${payload.issuer || 'Let\'s Encrypt / CA'})`;
+          const ocspInfo = payload.ocsp?.stapled ? ' | OCSP Stapled' : '';
+          summaryDetail = `Certificato SSL/TLS valido (${days} giorni residui - Issuer: ${payload.issuer || 'Let\'s Encrypt / CA'}${ocspInfo})`;
         } else if ((key === 'portScan' || key === 'portscan') && (payload.ports || payload.openPorts || payload.open_ports)) {
           const portItems = payload.ports || [];
           const openList = Array.isArray(portItems)
@@ -313,9 +314,12 @@ export function ExportReportModal({
               const breaches = res.breachesCount || 0;
               det = `${comb} credenziali COMB esposte, ${breaches} data breach storici rilevati`;
             } else if (k === 'emailArmor') {
-              const sts = (res.mtaSts as { present?: boolean })?.present ? 'MTA-STS: Presente' : 'MTA-STS: Assente';
-              const bimi = (res.bimi as { present?: boolean })?.present ? 'BIMI: Presente' : 'BIMI: Assente';
-              det = `${sts} | ${bimi}`;
+              const mta = res.mtaSts as { mode?: string; enabled?: boolean } | undefined;
+              const sts = mta?.enabled ? `MTA-STS: ${mta.mode || 'Attivo'}` : 'MTA-STS: Assente';
+              const bimi = (res.bimi as { enabled?: boolean })?.enabled ? 'BIMI: Attivo' : 'BIMI: Assente';
+              const starttls = (res.starttls as { supportsStarttls?: boolean })?.supportsStarttls ? 'MX STARTTLS: Attivo' : '';
+              const dane = (res.dane as { enabled?: boolean })?.enabled ? 'DANE: Conforme' : '';
+              det = [sts, bimi, starttls, dane].filter(Boolean).join(' | ');
             }
           } else if (v?.message) {
             det = String(v.message);
@@ -354,6 +358,7 @@ export function ExportReportModal({
     // Tabella 3.A: Vulnerability findings
     const vulnLabelMap: Record<string, string> = {
       files: 'FILE SENSIBILI (.ENV / .GIT)',
+      'directory-listing': 'DIRECTORY LISTING (CWE-548)',
       secrets: 'API SECRETS & CODE LEAKS',
       cors: 'AUDIT POLICY CORS',
       cookies: 'SICUREZZA COOKIE (XSS/CSRF)',
@@ -395,6 +400,16 @@ export function ExportReportModal({
             } else {
               s = 'NESSUNA ANOMALIA';
               det = 'Tutti i percorsi sensibili (.env, .git, dump SQL) risultano protetti (404/403/redirect)';
+            }
+          } else if (k === 'directory-listing') {
+            const expDirs = (v?.result?.exposedDirectories || []) as Array<{ path?: string }>;
+            if (expDirs.length > 0) {
+              s = 'RISCHIO';
+              const names = expDirs.map(d => d.path).slice(0, 3).join(', ');
+              det = `Rilevate ${expDirs.length} directory con indicizzazione aperta (${names})`;
+            } else {
+              s = 'NESSUNA ANOMALIA';
+              det = 'Nessun directory listing attivo su cartelle standard';
             }
           } else if (k === 'secrets') {
             const sec = v?.result?.detectedSecrets?.length || 0;

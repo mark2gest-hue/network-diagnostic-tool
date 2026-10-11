@@ -19,6 +19,8 @@ export interface SubdomainItem {
   cname?: string;
   isTakeoverVulnerable: boolean;
   takeoverFingerprint?: string;
+  evidenceSnippet?: string;
+  curlCommand?: string;
   status: 'active' | 'unresolved' | 'vulnerable';
 }
 
@@ -265,9 +267,16 @@ export function SubdomainHunterCard({ target, perspectiveMode = 'executive' }: S
                     )}
 
                     {item.isTakeoverVulnerable && (
-                      <span className="bg-[#ef4444] text-white font-bold px-2 py-0.5 rounded text-[10px] animate-pulse">
-                        TAKEOVER POSSIBILE: {item.takeoverFingerprint}
-                      </span>
+                      <div className="w-full flex flex-col gap-1 mt-1">
+                        <span className="bg-[#ef4444] text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block w-fit">
+                          TAKEOVER CONFERMATO: {item.takeoverFingerprint}
+                        </span>
+                        {item.curlCommand && (
+                          <div className="p-1.5 rounded bg-black/80 border border-red-500/50 text-[10px] text-zinc-300 font-mono select-all break-all">
+                            {item.curlCommand}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

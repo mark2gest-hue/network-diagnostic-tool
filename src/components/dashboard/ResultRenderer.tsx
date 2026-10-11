@@ -328,6 +328,66 @@ export function ResultRenderer({ result }: ResultRendererProps) {
       );
     }
 
+    // 6.9 Vulnerability: Exposed Directories (Directory Listing CWE-548)
+    if ('exposedDirectories' in data && Array.isArray(data.exposedDirectories)) {
+      const exposed = data.exposedDirectories as Array<{
+        path: string;
+        label: string;
+        risk: string;
+        url: string;
+        server: string;
+        evidenceSnippet: string;
+        curlCommand: string;
+        detail: string;
+      }>;
+      return (
+        <div className="space-y-2.5 text-xs">
+          {exposed.length === 0 ? (
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs leading-snug">Nessun Directory Listing attivo (autoindex protetto/disabilitato).</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <span className="text-[10px] text-red-400 uppercase font-bold tracking-wider block">
+                Directory con Indicizzazione Aperta ({exposed.length}):
+              </span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {exposed.map((dir, i) => (
+                  <div key={i} className="p-2 rounded-lg bg-red-950/20 border border-red-500/30 font-mono text-xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-red-300 truncate" title={dir.url}>{dir.path}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[8px] bg-red-950/60 text-red-300 border border-red-500/40 px-1 py-0.2 rounded font-mono font-bold">
+                          CWE-548
+                        </span>
+                        <Badge variant="outline" className="text-[9px] uppercase bg-red-500/20 border-red-500/50 text-red-300 whitespace-nowrap">
+                          {dir.risk || 'High'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-zinc-400">
+                      Evidenza server: <span className="text-zinc-200">{dir.evidenceSnippet}</span> (Server: {dir.server})
+                    </div>
+                    {dir.curlCommand && (
+                      <div className="p-1.5 rounded bg-black/60 border border-zinc-800 text-[10px] text-zinc-300 font-mono select-all break-all">
+                        {dir.curlCommand}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {Boolean(data.recommendation) && (
+            <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">
+              {String(data.recommendation)}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     // 7. Vulnerability: Exposed Sensitive Files
     if ('exposedFiles' in data && Array.isArray(data.exposedFiles)) {
       const exposed = data.exposedFiles as ExposedFile[];
@@ -580,6 +640,26 @@ export function ResultRenderer({ result }: ResultRendererProps) {
         testedNs?: string;
         message?: string;
       }) || {};
+      const starttls = (data.starttls as {
+        tested?: boolean;
+        mxHost?: string;
+        supportsStarttls?: boolean;
+        cert?: { issuer: string; validTo: string; daysRemaining: number; isExpired: boolean };
+        egressFiltered?: boolean;
+        error?: string;
+        opensslCommand?: string;
+      }) || null;
+      const dane = (data.dane as {
+        enabled?: boolean;
+        record?: string;
+        queryHost?: string;
+        command?: string;
+      }) || null;
+      const danglingMx = (data.danglingMx as {
+        detected?: boolean;
+        count?: number;
+        danglingList?: Array<{ exchange: string; priority: number }>;
+      }) || null;
       const score = typeof data.score === 'number' ? data.score : 0;
 
       return (
@@ -600,8 +680,87 @@ export function ResultRenderer({ result }: ResultRendererProps) {
             </div>
           </div>
 
-          {/* 3 Controlli: MTA-STS, BIMI, AXFR */}
+          {/* Dangling MX Alert se presente */}
+          {danglingMx?.detected && (
+            <div className="p-2 rounded-lg bg-red-950/40 border border-red-500/50 space-y-1">
+              <div className="flex items-center justify-between text-xs font-bold text-red-300">
+                <span>🚨 Record MX Orfano Rilevato (Rischio Dirottamento Email)</span>
+                <Badge variant="outline" className="bg-red-950/60 text-red-300 border-red-500/40 text-[9px] uppercase font-bold">
+                  CWE-673 Critico
+                </Badge>
+              </div>
+              <div className="text-[10px] text-zinc-300 font-mono">
+                {danglingMx.danglingList?.map((d) => `${d.exchange} (Priority: ${d.priority})`).join(', ')}
+              </div>
+            </div>
+          )}
+
+          {/* Controlli Email Posture */}
           <div className="space-y-1.5">
+            {/* MX STARTTLS & Certificato */}
+            {starttls && (
+              <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
+                <div className="flex items-center justify-between gap-2 font-mono text-xs">
+                  <span className="font-bold text-zinc-200 truncate">MX STARTTLS ({starttls.mxHost || 'Primario'})</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[9px] shrink-0 whitespace-nowrap font-mono',
+                      starttls.supportsStarttls
+                        ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                        : starttls.egressFiltered
+                        ? 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                        : 'bg-red-950/40 text-red-300 border-red-500/40'
+                    )}
+                  >
+                    {starttls.supportsStarttls
+                      ? 'STARTTLS Attivo'
+                      : starttls.egressFiltered
+                      ? 'Porta 25 Filtrata'
+                      : 'Nessun STARTTLS'}
+                  </Badge>
+                </div>
+                {starttls.cert && (
+                  <div className="text-[10px] text-zinc-400 font-mono">
+                    Certificato MX: <span className="text-zinc-200">{starttls.cert.issuer}</span> ({starttls.cert.daysRemaining} gg residui{starttls.cert.isExpired ? ' - SCADUTO!' : ''})
+                  </div>
+                )}
+                {starttls.opensslCommand && (
+                  <div className="p-1 rounded bg-black/60 border border-zinc-800 text-[9px] text-zinc-400 font-mono select-all break-all">
+                    {starttls.opensslCommand}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* DANE TLSA */}
+            {dane && (
+              <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
+                <div className="flex items-center justify-between gap-2 font-mono text-xs">
+                  <span className="font-bold text-zinc-200 truncate">DANE TLSA (RFC 6698)</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[9px] shrink-0 whitespace-nowrap font-mono',
+                      dane.enabled
+                        ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                        : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                    )}
+                  >
+                    {dane.enabled ? 'DANE Conforme' : 'Non Configurato'}
+                  </Badge>
+                </div>
+                <div className="text-[10px] text-zinc-500 truncate font-mono">
+                  {dane.record ? `Record: ${dane.record}` : `Query: ${dane.queryHost || 'N/A'}`}
+                </div>
+                {dane.command && (
+                  <div className="p-1 rounded bg-black/60 border border-zinc-800 text-[9px] text-zinc-400 font-mono select-all break-all">
+                    {dane.command}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* MTA-STS */}
             <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
               <div className="flex items-center justify-between gap-2 font-mono text-xs">
@@ -1101,6 +1260,44 @@ export function ResultRenderer({ result }: ResultRendererProps) {
               <span className="truncate block text-zinc-300">{Boolean(data.valid_to) ? new Date(String(data.valid_to)).toLocaleDateString() : '-'}</span>
             </div>
           </div>
+
+          {Boolean(data.ocsp) && typeof data.ocsp === 'object' && (() => {
+            const ocsp = data.ocsp as {
+              stapled?: boolean;
+              responderUrl?: string;
+              status?: string;
+              message?: string;
+              opensslCommand?: string;
+            };
+            return (
+              <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 space-y-1">
+                <div className="flex items-center justify-between gap-2 font-mono text-xs">
+                  <span className="font-bold text-zinc-200 truncate">OCSP Stapling / Responder</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[9px] shrink-0 whitespace-nowrap font-mono',
+                      ocsp.stapled
+                        ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
+                        : ocsp.responderUrl
+                        ? 'bg-blue-950/40 text-blue-300 border-blue-500/40'
+                        : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                    )}
+                  >
+                    {ocsp.stapled ? 'Stapling Attivo' : ocsp.responderUrl ? 'Responder Delegato' : 'Non Presente'}
+                  </Badge>
+                </div>
+                <p className="text-[10px] text-zinc-400 font-mono leading-relaxed">
+                  {ocsp.message}
+                </p>
+                {ocsp.opensslCommand && (
+                  <div className="p-1 rounded bg-black/60 border border-zinc-800 text-[9px] text-zinc-400 font-mono select-all break-all">
+                    {ocsp.opensslCommand}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       );
     }
@@ -1293,6 +1490,62 @@ export function ResultRenderer({ result }: ResultRendererProps) {
               </div>
             ))}
           </div>
+
+          {Boolean(data.informationDisclosure) && typeof data.informationDisclosure === 'object' && (() => {
+            const info = data.informationDisclosure as {
+              totalDisclosed: number;
+              disclosures: Array<{
+                header: string;
+                value: string;
+                hasVersion: boolean;
+                risk: string;
+                isEol: boolean;
+                eolDetail?: string;
+              }>;
+              eolDetected: Array<{ technology?: string; eolDetail?: string }>;
+              curlCommand?: string;
+            };
+
+            if (!info || info.totalDisclosed === 0) return null;
+
+            return (
+              <div className="space-y-1.5 p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-zinc-400 uppercase font-semibold">
+                    Banner & Information Disclosure (CWE-200)
+                  </span>
+                  <Badge variant="outline" className={cn(
+                    'text-[8px] uppercase font-bold',
+                    info.eolDetected.length > 0 ? 'bg-red-950/40 text-red-300 border-red-500/40' : 'bg-amber-950/40 text-amber-300 border-amber-500/40'
+                  )}>
+                    {info.eolDetected.length > 0 ? 'Rilevato Software EOL' : `${info.totalDisclosed} Banner Esposti`}
+                  </Badge>
+                </div>
+
+                <div className="space-y-1 font-mono text-[10px]">
+                  {info.disclosures.map((d, idx) => (
+                    <div key={idx} className="p-1 rounded bg-black/40 border border-zinc-800/80 flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 uppercase">{d.header}:</span>
+                        <span className="text-zinc-200 truncate">{d.value}</span>
+                      </div>
+                      {d.isEol && (
+                        <span className="text-[9px] text-red-400 font-sans font-semibold">
+                          ⚠️ {d.eolDetail}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {info.curlCommand && (
+                  <div className="p-1.5 rounded bg-black/80 border border-zinc-800 text-[10px] text-zinc-400 font-mono select-all break-all">
+                    {info.curlCommand}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {Boolean(data.recommendation) && (
             <p className="text-[10px] text-zinc-400 bg-zinc-950/40 p-2 rounded border border-zinc-800/80 leading-relaxed">

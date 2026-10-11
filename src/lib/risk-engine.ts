@@ -317,6 +317,29 @@ export function extractFindingsFromResults(rawResults: Record<string, unknown>):
     }
   }
 
+  // Analisi Software EOL (da /api/security/headers)
+  const rawHeadersObj = unwrap<{ informationDisclosure?: { eolDetected?: Array<{ technology?: string; eolDetail?: string; value?: string; risk?: string }> } }>(rawResults['headers'] || secObj?.['headers']);
+  if (rawHeadersObj?.informationDisclosure?.eolDetected && rawHeadersObj.informationDisclosure.eolDetected.length > 0) {
+    for (const eol of rawHeadersObj.informationDisclosure.eolDetected) {
+      findings.push({
+        id: `sec-eol-${(eol.technology || 'software').toLowerCase().replace(/[^a-zA-Z0-9]/g, '_')}`,
+        category: 'security',
+        severity: 'high',
+        title: `Software End-of-Life Rilevato: ${eol.technology || 'Web Server'}`,
+        description: `Il web server o runtime in esecuzione (${eol.value || eol.technology}) è ufficialmente deprecato e non riceve più aggiornamenti di sicurezza.`,
+        evidence: `Dettaglio banner: ${eol.value || 'N/A'}. Diagnosi: ${eol.eolDetail || 'Versione End-of-Life'}`,
+        impact: 'Vulnerabilità note con exploit pubblici disponibili senza possibilità di patch ufficiale da parte del vendor.',
+        confidence: 0.99,
+        remediation: {
+          action: `Aggiornare ${eol.technology || 'il componente'} all'ultimo ramo stabile supportato a lungo termine (LTS).`,
+          codeSnippet: '# Esempio Debian/Ubuntu:\napt update && apt --only-upgrade install nginx',
+          technicalReference: 'CWE-1104: Use of Unmaintained Third Party Components',
+        },
+        timestamp: now,
+      });
+    }
+  }
+
   // 2. File Sensibili & Backup (esclude categoricamente file pubblici come robots.txt)
   const rawFilesPayload = unwrap<Record<string, unknown> | Array<unknown>>(rawResults['files'] || vulnObj?.['files']);
   const filesList = Array.isArray(rawFilesPayload)
@@ -346,6 +369,37 @@ export function extractFindingsFromResults(rawResults: Record<string, unknown>):
           action: 'Rimuovere immediatamente il file dal web root e bloccare l’accesso a estensioni sensibili (.env, .git, .sql) nel web server.',
           codeSnippet: 'location ~ /\\.(env|git|bak|sql) {\n    deny all;\n    return 404;\n}',
           technicalReference: 'OWASP Top 10 - A01:2021 Broken Access Control',
+        },
+        timestamp: now,
+      });
+    }
+  }
+
+  // 2.1 Directory Listing (CWE-548)
+  const rawDirPayload = unwrap<Record<string, unknown> | Array<unknown>>(rawResults['directory-listing'] || vulnObj?.['directory-listing']);
+  const dirList = Array.isArray(rawDirPayload)
+    ? rawDirPayload
+    : Array.isArray((rawDirPayload as { exposedDirectories?: unknown[] })?.exposedDirectories)
+    ? (rawDirPayload as { exposedDirectories: unknown[] }).exposedDirectories
+    : [];
+
+  for (const item of dirList) {
+    const dir = item as { path?: string; url?: string; risk?: string; server?: string; evidenceSnippet?: string; curlCommand?: string };
+    if (dir.path) {
+      const isCritical = dir.risk === 'critical' || dir.path.includes('backup') || dir.path.includes('data');
+      findings.push({
+        id: `vuln-dir-${dir.path.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        category: 'security',
+        severity: isCritical ? 'critical' : 'high',
+        title: `Directory Listing Aperto: ${dir.path}`,
+        description: `Indicizzazione automatica attiva (autoindex). I visitatori possono navigare e scaricare l'intero contenuto della cartella.`,
+        evidence: `${dir.evidenceSnippet || 'Autoindex table/listing detected'} su ${dir.url || dir.path}. Web Server: ${dir.server || 'N/A'}. Verifica: ${dir.curlCommand || 'N/A'}`,
+        impact: 'Fuga di dati aziendali, file media riservati e backup archiviati nelle directory.',
+        confidence: 0.99,
+        remediation: {
+          action: 'Disabilitare l\'autoindex nel web server (es. "autoindex off;" su Nginx o "Options -Indexes" su Apache).',
+          codeSnippet: '# Nginx:\nlocation / {\n    autoindex off;\n}\n\n# Apache (.htaccess):\nOptions -Indexes',
+          technicalReference: 'CWE-548: Exposure of Information Through Directory Listing',
         },
         timestamp: now,
       });
@@ -580,6 +634,72 @@ export function extractFindingsFromResults(rawResults: Record<string, unknown>):
       },
       timestamp: now,
     });
+  }
+
+  // 7.1 Email Armor: Dangling MX, STARTTLS, DANE
+  const armor = unwrap<{
+    danglingMx?: { detected?: boolean; count?: number; danglingList?: Array<{ exchange: string; priority: number }> };
+    starttls?: { tested?: boolean; mxHost?: string; supportsStarttls?: boolean; cert?: { isExpired?: boolean; daysRemaining?: number } };
+    dane?: { enabled?: boolean };
+  }>(rawResults['emailArmor'] || secObj?.['emailArmor']);
+
+  if (armor) {
+    if (armor.danglingMx?.detected && armor.danglingMx.danglingList && armor.danglingMx.danglingList.length > 0) {
+      findings.push({
+        id: 'sec-dangling-mx',
+        category: 'security',
+        severity: 'critical',
+        title: 'Record MX Orfano Rilevato (Rischio Dirottamento Posta)',
+        description: `Uno o più record MX puntano a host non registrati o non risolti (${armor.danglingMx.danglingList.map(m => m.exchange).join(', ')}). Un attaccante può registrare il dominio di destinazione e intercettare tutte le email in transito.`,
+        evidence: `Host MX non risolti: ${armor.danglingMx.danglingList.map(m => m.exchange).join(', ')}`,
+        impact: 'Intercettazione totale della corrispondenza email aziendale e reset password tramite email.',
+        confidence: 0.99,
+        remediation: {
+          action: 'Rimuovere immediatamente i record MX orfani o aggiornarli con server di posta attivi.',
+          codeSnippet: '# Verifica con dig:\ndig +short MX tuodominio.com',
+          technicalReference: 'CWE-673 / RFC 5321',
+        },
+        timestamp: now,
+      });
+    }
+
+    if (armor.starttls?.tested && !armor.starttls.supportsStarttls) {
+      findings.push({
+        id: 'sec-mx-no-starttls',
+        category: 'configuration',
+        severity: 'medium',
+        title: `Mancato Supporto STARTTLS sul Server MX (${armor.starttls.mxHost || 'Primario'})`,
+        description: `Il mail server primario accetta posta unicamente in chiaro senza cifratura di trasporto STARTTLS.`,
+        evidence: `Connessione SMTP porta 25 verso ${armor.starttls.mxHost}: nessun comando STARTTLS annunciato in EHLO.`,
+        impact: 'Comunicazioni email esposte a intercettazione passiva e man-in-the-middle in transito.',
+        confidence: 0.95,
+        remediation: {
+          action: 'Abilitare STARTTLS e configurare un certificato TLS valido sul server SMTP.',
+          codeSnippet: '# Postfix (main.cf):\nsmtpd_tls_security_level = may\nsmtpd_tls_cert_file = /etc/ssl/certs/mail.crt',
+          technicalReference: 'RFC 3207 / MITRE D3-MHA',
+        },
+        timestamp: now,
+      });
+    }
+
+    if (armor.starttls?.cert?.isExpired) {
+      findings.push({
+        id: 'sec-mx-cert-expired',
+        category: 'security',
+        severity: 'high',
+        title: `Certificato TLS Scaduto sul Server MX (${armor.starttls.mxHost})`,
+        description: `Il certificato crittografico configurato sul mail server per STARTTLS è scaduto (${armor.starttls.cert.daysRemaining} giorni fa).`,
+        evidence: `Server MX: ${armor.starttls.mxHost}. Stato certificato: Scaduto.`,
+        impact: 'I mail server mittenti con MTA-STS o DANE rigoroso rifiuteranno di consegnare email.',
+        confidence: 0.99,
+        remediation: {
+          action: 'Rinnovare e installare tempestivamente il certificato SSL/TLS sul demone SMTP.',
+          codeSnippet: 'certbot certonly --standalone -d mail.tuodominio.com',
+          technicalReference: 'RFC 8461 (MTA-STS)',
+        },
+        timestamp: now,
+      });
+    }
   }
 
   // 8. Blacklist & Minacce IP (DNSBL / RBL)
