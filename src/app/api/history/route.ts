@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, ensureTables } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import crypto from 'crypto';
 
@@ -12,6 +12,7 @@ export async function GET() {
   }
 
   try {
+    await ensureTables();
     const result = await db.execute({
       sql: 'SELECT id, user_id, test_type, target, results, created_at FROM test_history WHERE user_id = ? ORDER BY created_at DESC',
       args: [session.userId]
@@ -45,8 +46,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await getSession();
-  
+
   try {
+    await ensureTables();
     const { test_type, target, results } = await req.json();
     const id = crypto.randomUUID();
     const resultsJson = typeof results === 'string' ? results : JSON.stringify(results);

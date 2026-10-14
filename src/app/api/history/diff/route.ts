@@ -5,8 +5,25 @@ import { extractFindingsFromResults, calculateRiskAssessment } from '@/lib/risk-
 
 import { computeScanDiff } from '@/lib/diff-engine';
 import { ScanSnapshot } from '@/types/findings';
+import { pentestToScanSnapshot, isPentestResult } from '@/lib/pentest-findings';
 
 export const dynamic = 'force-dynamic';
+
+function toSnapshot(results: unknown, target: string, timestamp: string): ScanSnapshot {
+  if (isPentestResult(results)) {
+    return pentestToScanSnapshot(results);
+  }
+  const findings = extractFindingsFromResults(results as Record<string, unknown>);
+  const risk = calculateRiskAssessment(findings);
+  return {
+    target: target || 'Target',
+    timestamp: timestamp || new Date().toISOString(),
+    results: results as Record<string, unknown>,
+    findings,
+    riskScore: risk.overallScore,
+    grade: risk.grade,
+  };
+}
 
 export async function POST(req: Request) {
   try {
@@ -35,53 +52,28 @@ export async function POST(req: Request) {
         const prevResults = typeof prevRow.results === 'string' ? JSON.parse(prevRow.results as string) : prevRow.results;
         const currResults = typeof currRow.results === 'string' ? JSON.parse(currRow.results as string) : currRow.results;
 
-        const prevFindings = extractFindingsFromResults(prevResults);
-        const currFindings = extractFindingsFromResults(currResults);
-
-        const prevRisk = calculateRiskAssessment(prevFindings);
-        const currRisk = calculateRiskAssessment(currFindings);
-
-        prevSnapshot = {
-          target: (prevRow.target as string) || 'Target',
-          timestamp: (prevRow.created_at as string) || new Date().toISOString(),
-          results: prevResults,
-          findings: prevFindings,
-          riskScore: prevRisk.overallScore,
-          grade: prevRisk.grade,
-        };
-
-        currSnapshot = {
-          target: (currRow.target as string) || 'Target',
-          timestamp: (currRow.created_at as string) || new Date().toISOString(),
-          results: currResults,
-          findings: currFindings,
-          riskScore: currRisk.overallScore,
-          grade: currRisk.grade,
-        };
+        prevSnapshot = toSnapshot(
+          prevResults,
+          (prevRow.target as string) || 'Target',
+          (prevRow.created_at as string) || new Date().toISOString()
+        );
+        currSnapshot = toSnapshot(
+          currResults,
+          (currRow.target as string) || 'Target',
+          (currRow.created_at as string) || new Date().toISOString()
+        );
       }
     } else if (previousScan && currentScan) {
-      const prevFindings = extractFindingsFromResults(previousScan.results || previousScan);
-      const currFindings = extractFindingsFromResults(currentScan.results || currentScan);
-      const prevRisk = calculateRiskAssessment(prevFindings);
-      const currRisk = calculateRiskAssessment(currFindings);
-
-      prevSnapshot = {
-        target: previousScan.target || 'Target A',
-        timestamp: previousScan.timestamp || previousScan.created_at || 'T0',
-        results: previousScan.results || previousScan,
-        findings: prevFindings,
-        riskScore: prevRisk.overallScore,
-        grade: prevRisk.grade,
-      };
-
-      currSnapshot = {
-        target: currentScan.target || 'Target B',
-        timestamp: currentScan.timestamp || currentScan.created_at || 'T1',
-        results: currentScan.results || currentScan,
-        findings: currFindings,
-        riskScore: currRisk.overallScore,
-        grade: currRisk.grade,
-      };
+      prevSnapshot = toSnapshot(
+        previousScan.results || previousScan,
+        previousScan.target || 'Target A',
+        previousScan.timestamp || previousScan.created_at || 'T0'
+      );
+      currSnapshot = toSnapshot(
+        currentScan.results || currentScan,
+        currentScan.target || 'Target B',
+        currentScan.timestamp || currentScan.created_at || 'T1'
+      );
     }
 
     if (!prevSnapshot || !currSnapshot) {
