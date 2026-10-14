@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
 import { getJwtSecret } from './lib/constants';
 
 const SCAN_PREFIXES = [
@@ -11,25 +10,69 @@ const SCAN_PREFIXES = [
   '/api/lan',
   '/api/ai',
   '/api/active-defense',
+  '/api/defense',
 ];
+
+async function verifyTokenHmac(token: string): Promise<boolean> {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const [headerB64, payloadB64, signatureB64] = parts;
+
+    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      getJwtSecret(),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    // Decodifica signature Base64URL
+    const b64 = signatureB64.replace(/-/g, '+').replace(/_/g, '/');
+    const binStr = atob(b64);
+    const signature = new Uint8Array(binStr.length);
+    for (let i = 0; i < binStr.length; i++) {
+      signature[i] = binStr.charCodeAt(i);
+    }
+
+    const isValid = await crypto.subtle.verify('HMAC', key, signature, data);
+    if (!isValid) return false;
+
+    // Controlla scadenza se presente
+    const payloadStr = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const payload = JSON.parse(payloadStr);
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('session')?.value;
   const path = request.nextUrl.pathname;
 
-  const isDemoMode = (process.env.APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
+  const hostname = request.nextUrl.hostname;
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname.endsWith('.local');
+
+  // In locale non esiste la schermata di login: reindirizza subito alla dashboard
+  if (isLocalHost && path === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  const isDemoMode = !isLocalHost && (process.env.APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
   if (isDemoMode && SCAN_PREFIXES.some((p) => path.startsWith(p))) {
     return NextResponse.json({ error: 'Disabilitato in modalità demo: scansioni attive solo in locale' }, { status: 403 });
   }
 
   if (isDemoMode && !path.startsWith('/api')) {
-    try {
-      if (!token) throw new Error('no session');
-      await jwtVerify(token, getJwtSecret(), { algorithms: ['HS256'] });
-      return NextResponse.next();
-    } catch {
+    if (!token || !(await verifyTokenHmac(token))) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
+    return NextResponse.next();
   }
 
   // Proteggi l'intero percorso /api/history (qualsiasi metodo: GET, POST, DELETE) e /api/tests
@@ -39,17 +82,11 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/api/webhooks') ||
     path === '/api/auth/me';
 
-  if (isProtectedPath) {
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized: login richiesto' }, { status: 401 });
+  if (!isLocalHost && isProtectedPath) {
+    if (!token || !(await verifyTokenHmac(token))) {
+      return NextResponse.json({ error: 'Unauthorized: login o token non valido' }, { status: 401 });
     }
-
-    try {
-      await jwtVerify(token, getJwtSecret(), { algorithms: ['HS256'] });
-      return NextResponse.next();
-    } catch {
-      return NextResponse.json({ error: 'Unauthorized: token non valido' }, { status: 401 });
-    }
+    return NextResponse.next();
   }
 
   return NextResponse.next();
@@ -57,6 +94,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/login',
     '/api/history/:path*',
     '/api/assets/:path*',
     '/api/webhooks/:path*',
@@ -69,5 +107,6 @@ export const config = {
     '/api/lan/:path*',
     '/api/ai/:path*',
     '/api/active-defense',
+    '/api/defense/:path*',
   ],
 };

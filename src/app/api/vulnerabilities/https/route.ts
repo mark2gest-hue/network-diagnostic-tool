@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
+import { safeFetch } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,24 +10,21 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const cleanTarget = validation.data;
+  const cleanTarget = validation.target;
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
     // Eseguiamo la richiesta in HTTP puro (porta 80)
-    const res = await fetch(`http://${cleanTarget}`, {
+    const res = await safeFetch(`http://${cleanTarget}`, {
       method: 'GET',
       redirect: 'manual',
-      signal: controller.signal
+      lookup,
     });
-    clearTimeout(timeout);
 
     const status = res.status;
     const location = res.headers.get('location') || '';
@@ -59,7 +58,7 @@ export async function GET(req: Request) {
         : 'Configura il web server o il reverse proxy per reindirizzare tutte le richieste HTTP in chiaro a HTTPS con codice di stato 301.'
     });
   } catch {
-    return NextResponse.json({ 
+    return NextResponse.json({
       status: 'warning',
       message: 'Porta HTTP (80) non accessibile o chiusa. Il server potrebbe accettare solo connessioni dirette HTTPS.',
       recommendation: 'Verifica che il redirect da HTTP standard sia attivo per i client che digitano l\'URL senza prefisso https://.'

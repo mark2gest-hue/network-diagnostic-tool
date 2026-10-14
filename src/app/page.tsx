@@ -143,12 +143,33 @@ const MODULES: TestModuleDefinition[] = [
   },
 ];
 
-// Stesso default del middleware: demo in produzione, local altrimenti
-const IS_DEMO_MODE =
-  (process.env.NEXT_PUBLIC_APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
+function isHostLocal(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h.endsWith('.local');
+}
 
 export default function Dashboard() {
-  const [demoScenario, setDemoScenario] = useState<DemoScenario | null>(IS_DEMO_MODE ? DEMO_SCENARIOS.fintech_prod : null);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && isHostLocal()) {
+      return false;
+    }
+    return (process.env.NEXT_PUBLIC_APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
+  });
+  const [demoScenario, setDemoScenario] = useState<DemoScenario | null>(() => {
+    if (typeof window !== 'undefined' && isHostLocal()) {
+      return null;
+    }
+    const isDemo = (process.env.NEXT_PUBLIC_APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
+    return isDemo ? DEMO_SCENARIOS.fintech_prod : null;
+  });
+
+  useEffect(() => {
+    if (isHostLocal()) {
+      setIsDemoMode(false);
+      setDemoScenario(null);
+    }
+  }, []);
   const [activeSection, setActiveSection] = useState<MainSectionTab>('remediation');
   const [target, setTarget] = useState<string>('aiutiamoci.cloud');
   const [searchInput, setSearchInput] = useState<string>('aiutiamoci.cloud');
@@ -235,7 +256,7 @@ export default function Dashboard() {
     `flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.875rem] font-medium transition-colors ${
       active ? 'bg-accent-bg text-accent font-semibold' : 'text-ink-2 hover:bg-hover hover:text-foreground'
     }`;
-  const showDomainBar = !IS_DEMO_MODE && (activeSection === 'remediation' || activeSection === 'external' || activeSection === 'pentest' || activeSection === 'security' || activeSection === 'vulnerabilities');
+  const showDomainBar = !isDemoMode && (activeSection === 'remediation' || activeSection === 'external' || activeSection === 'pentest' || activeSection === 'security' || activeSection === 'vulnerabilities');
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:flex">
@@ -253,7 +274,7 @@ export default function Dashboard() {
         </div>
 
         <nav aria-label="Sezioni" className="flex flex-wrap gap-1 px-3 py-2 lg:flex-col lg:flex-nowrap">
-          {navTabs.filter((tab) => !IS_DEMO_MODE || tab.id === 'remediation' || tab.id === 'manual').map((tab) => {
+          {navTabs.filter((tab) => !isDemoMode || tab.id === 'remediation' || tab.id === 'manual').map((tab) => {
             const TabIcon = tab.icon;
             const isSelected = activeSection === tab.id;
             return (
@@ -313,7 +334,7 @@ export default function Dashboard() {
             </label>
           </div>
 
-          {!IS_DEMO_MODE && (
+          {!isDemoMode && (
             <button type="button" onClick={() => setShowActiveDefenseModal(true)} className={navItemCls(false)}>
               <ShieldHalf className="size-4 shrink-0" aria-hidden="true" />
               Sentinel
@@ -382,7 +403,7 @@ export default function Dashboard() {
         {/* ========================================================================= */}
         {/* TAB 0: EXECUTIVE SUMMARY & REMEDIATION PLAN */}
         {/* ========================================================================= */}
-        {activeSection === 'remediation' && IS_DEMO_MODE && (
+        {activeSection === 'remediation' && isDemoMode && (
           <DemoScenarioSelector
             activeScenarioId={demoScenario?.id ?? null}
             onSelectScenario={setDemoScenario}
@@ -393,7 +414,7 @@ export default function Dashboard() {
           <ExecutiveRemediationSummary 
             target={demoScenario ? demoScenario.asset.target : target} 
             perspectiveMode={perspectiveMode} 
-            onOpenExportModal={IS_DEMO_MODE ? undefined : () => setReportModalOpen(true)}
+            onOpenExportModal={isDemoMode ? undefined : () => setReportModalOpen(true)}
             demoAssessment={demoScenario?.assessment}
             results={results}
             internalResults={internalSuite.results}

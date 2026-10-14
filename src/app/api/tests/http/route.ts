@@ -1,25 +1,31 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
+import { safeFetch } from '@/lib/safe-http-probe';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const target = searchParams.get('target');
 
-  const validation = targetSchema.safeParse(target);
+  // Risolve il DNS e blocca target privati/riservati (anti-SSRF), non solo il formato stringa.
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const cleanTarget = validation.data;
+  const cleanTarget = validation.target;
   const url = cleanTarget.startsWith('http') ? cleanTarget : `https://${cleanTarget}`;
+  // Pinna il DNS agli IP validati: elimina la finestra TOCTOU/DNS Rebinding
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     const startTime = Date.now();
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       method: 'GET',
       headers: {
         'User-Agent': 'NetworkDiagTool/1.0',
       },
+      lookup,
       redirect: 'manual', // We want to track the chain
     });
     const endTime = Date.now();
@@ -45,25 +51,23 @@ export async function GET(req: Request) {
     console.error('HTTP error:', error);
     // Try fallback to http if https failed
     if (url.startsWith('https://')) {
-        try {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 5000);
-            const startTime = Date.now();
-            const response = await fetch(url.replace('https', 'http'), { 
-              signal: controller.signal 
-            });
-            clearTimeout(id);
-            const endTime = Date.now();
-            return NextResponse.json({
-                status: response.status,
-                statusText: response.statusText,
-                responseTime: endTime - startTime,
-                headers: Object.fromEntries(response.headers.entries()),
-                redirectChain: []
-            });
-        } catch {
-            // Both https and http failed
-        }
+      try {
+        const startTime = Date.now();
+        const response = await safeFetch(url.replace('https', 'http'), {
+          lookup,
+          redirect: 'manual' // non seguire redirect verso target interni
+        });
+        const endTime = Date.now();
+        return NextResponse.json({
+          status: response.status,
+          statusText: response.statusText,
+          responseTime: endTime - startTime,
+          headers: Object.fromEntries(response.headers.entries()),
+          redirectChain: []
+        });
+      } catch {
+        // Both https and http failed
+      }
     }
     return NextResponse.json({ error: 'HTTP request failed' }, { status: 500 });
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
 import https from 'https';
 
 export const dynamic = 'force-dynamic';
@@ -9,12 +10,14 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const cleanTarget = validation.data;
+  const cleanTarget = validation.target;
+  // Pinna il DNS agli IP validati (anti TOCTOU/DNS Rebinding)
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     const timings = await new Promise<{
@@ -38,13 +41,14 @@ export async function GET(req: Request) {
         method: 'GET',
         path: '/',
         timeout: 7000,
+        lookup,
         headers: {
           'User-Agent': 'NetworkDiagOps/1.0',
           'Accept': '*/*'
         }
       }, (res) => {
         ttfbTime = performance.now() - startTime;
-        res.on('data', () => {});
+        res.on('data', () => { });
         res.on('end', () => {
           const totalTime = performance.now() - startTime;
           resolve({

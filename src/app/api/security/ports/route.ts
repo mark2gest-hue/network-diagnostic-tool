@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import net from 'net';
 import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup, type PinnedLookupFn } from '@/lib/security-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +14,11 @@ const RISKY_PORTS = [
   { port: 3389, name: 'RDP', risk: 'critical', recommendation: 'RDP esposto è un bersaglio comune per ransomware.' }
 ];
 
-async function checkPort(host: string, port: number, timeout: number = 2000): Promise<boolean> {
+async function checkPort(host: string, port: number, timeout: number = 2000, lookup?: PinnedLookupFn): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(timeout);
-    socket.connect(port, host, () => {
+    socket.connect({ port, host, lookup }, () => {
       socket.destroy();
       resolve(true);
     });
@@ -38,10 +39,11 @@ export async function GET(req: Request) {
 
   try {
     const validatedTarget = validation.target;
+    const lookup = createPinnedLookup(validation.resolvedIps);
     const results = await Promise.all(
       RISKY_PORTS.map(async (p) => ({
         ...p,
-        open: await checkPort(validatedTarget, p.port)
+        open: await checkPort(validatedTarget, p.port, 2000, lookup)
       }))
     );
 
@@ -50,11 +52,11 @@ export async function GET(req: Request) {
     return NextResponse.json({
       status: openRiskyPorts.some(p => p.risk === 'critical') ? 'fail' : (openRiskyPorts.length > 0 ? 'warning' : 'pass'),
       openRiskyPorts,
-      message: openRiskyPorts.length > 0 
-        ? `Trovate ${openRiskyPorts.length} porte a rischio aperte` 
+      message: openRiskyPorts.length > 0
+        ? `Trovate ${openRiskyPorts.length} porte a rischio aperte`
         : 'Nessuna porta critica comune rilevata come aperta',
-      recommendation: openRiskyPorts.length > 0 
-        ? 'Rivedi la configurazione del firewall e chiudi le porte non necessarie.' 
+      recommendation: openRiskyPorts.length > 0
+        ? 'Rivedi la configurazione del firewall e chiudi le porte non necessarie.'
         : 'Ottimo! Le porte critiche non sono esposte direttamente.'
     });
   } catch {

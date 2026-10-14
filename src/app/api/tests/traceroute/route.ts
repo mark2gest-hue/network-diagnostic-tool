@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import os from 'os';
+import net from 'net';
 
 const execAsync = promisify(exec);
 
@@ -19,16 +20,23 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const target = searchParams.get('target');
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const cleanTarget = validation.data;
+  const cleanTarget = validation.target;
+  // Anti TOCTOU/DNS Rebinding: traceroute lavora sull'IP già validato, non sul nome.
+  // Se il target è un hostname, usiamo il primo IP pubblico risolto; per gli IP letterali
+  // il target è già l'IP stesso.
+  const targetForTrace = net.isIP(cleanTarget)
+    ? cleanTarget
+    : (validation.resolvedIps[0] || cleanTarget);
+
   const isWindows = os.platform() === 'win32';
   const command = isWindows
-    ? `tracert -d -h 15 -w 1000 ${cleanTarget}`
-    : `traceroute -m 15 -q 1 -w 1 -n ${cleanTarget}`;
+    ? `tracert -d -h 15 -w 1000 ${targetForTrace}`
+    : `traceroute -m 15 -q 1 -w 1 -n ${targetForTrace}`;
 
   try {
     const { stdout } = await execAsync(command, { timeout: 15000 });

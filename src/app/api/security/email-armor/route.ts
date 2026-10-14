@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import dns from 'dns/promises';
 import net from 'net';
 import tls from 'tls';
-import { domainSchema, formatZodError } from '@/lib/validators';
-import { isPrivateOrReservedIP, ALLOW_LOCAL_DIAGNOSTICS } from '@/lib/security-guard';
+import { validateSafeTarget } from '@/lib/validators';
+import { isPrivateOrReservedIP, ALLOW_LOCAL_DIAGNOSTICS, createPinnedLookup, type PinnedLookupFn } from '@/lib/security-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +31,7 @@ export interface DaneInfo {
   command: string;
 }
 
-function checkMxStarttls(mxHost: string, timeoutMs = 4000): Promise<MxStarttlsInfo> {
+function checkMxStarttls(mxHost: string, timeoutMs = 4000, lookup?: PinnedLookupFn): Promise<MxStarttlsInfo> {
   return new Promise((resolve) => {
     let settled = false;
     const socket = new net.Socket();
@@ -71,7 +71,7 @@ function checkMxStarttls(mxHost: string, timeoutMs = 4000): Promise<MxStarttlsIn
     let state = 'BANNER';
     let banner = '';
 
-    socket.connect(25, mxHost, () => {
+    socket.connect({ port: 25, host: mxHost, lookup }, () => {
       // Attesa banner iniziale
     });
 
@@ -170,13 +170,23 @@ function checkMxStarttls(mxHost: string, timeoutMs = 4000): Promise<MxStarttlsIn
 }
 
 // Evita che un dominio controllato dall'attaccante faccia connettere il server verso IP interni (MX/NS -> IP privato)
-async function hostIsPublic(host: string): Promise<boolean> {
-  if (ALLOW_LOCAL_DIAGNOSTICS) return true;
+async function hostIsPublic(host: string): Promise<string[] | null> {
+  if (ALLOW_LOCAL_DIAGNOSTICS) {
+    try {
+      const addrs = await dns.lookup(host, { all: true });
+      return addrs.map((a) => a.address);
+    } catch {
+      return null;
+    }
+  }
   try {
     const addrs = await dns.lookup(host, { all: true });
-    return addrs.length > 0 && addrs.every((a) => !isPrivateOrReservedIP(a.address));
+    if (addrs.length > 0 && addrs.every((a) => !isPrivateOrReservedIP(a.address))) {
+      return addrs.map((a) => a.address);
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -243,7 +253,7 @@ function buildAxfrQuery(domain: string): Buffer {
   return tcpMsg;
 }
 
-function checkAxfr(domain: string, nsHost: string, timeoutMs = 2500): Promise<{ protected: boolean; testedNs: string; message: string }> {
+function checkAxfr(domain: string, nsHost: string, timeoutMs = 2500, lookup?: PinnedLookupFn): Promise<{ protected: boolean; testedNs: string; message: string }> {
   return new Promise((resolve) => {
     let settled = false;
     const socket = new net.Socket();
@@ -274,7 +284,7 @@ function checkAxfr(domain: string, nsHost: string, timeoutMs = 2500): Promise<{ 
       });
     });
 
-    socket.connect(53, nsHost, () => {
+    socket.connect({ port: 53, host: nsHost, lookup }, () => {
       try {
         const query = buildAxfrQuery(domain);
         socket.write(query);
@@ -327,12 +337,12 @@ export async function GET(req: Request) {
   const rawDomain = searchParams.get('domain');
   const domain = (rawDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = domainSchema.safeParse(domain);
+  const validation = await validateSafeTarget(domain);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedDomain = validation.data;
+  const validatedDomain = validation.target;
 
   try {
     // 1. MTA-STS (RFC 8461)
@@ -409,8 +419,10 @@ export async function GET(req: Request) {
       const nsRecords = await dns.resolveNs(validatedDomain).catch(() => []);
       if (nsRecords.length > 0) {
         const primaryNs = nsRecords[0];
-        if (await hostIsPublic(primaryNs)) {
-          axfrResult = await checkAxfr(validatedDomain, primaryNs);
+        const nsIps = await hostIsPublic(primaryNs);
+        if (nsIps) {
+          const nsLookup = createPinnedLookup(nsIps);
+          axfrResult = await checkAxfr(validatedDomain, primaryNs, 2500, nsLookup);
         } else {
           axfrResult = {
             protected: true,
@@ -455,17 +467,18 @@ export async function GET(req: Request) {
         );
 
         // Esegue verifica STARTTLS (solo su MX con IP pubblico) e DANE su host MX primario
-        const mxPublic = primaryMx && primaryMx !== '.' && (await hostIsPublic(primaryMx));
+        const mxIps = primaryMx && primaryMx !== '.' ? await hostIsPublic(primaryMx) : null;
+        const mxLookup = mxIps ? createPinnedLookup(mxIps) : undefined;
         const [starttlsRes, daneRes] = await Promise.all([
-          mxPublic
-            ? checkMxStarttls(primaryMx)
+          mxIps
+            ? checkMxStarttls(primaryMx, 4000, mxLookup)
             : Promise.resolve<MxStarttlsInfo>({
-                tested: false,
-                mxHost: primaryMx,
-                supportsStarttls: false,
-                error: 'MX assente o non risolto a IP pubblico: probe porta 25 saltato',
-                opensslCommand: `openssl s_client -starttls smtp -connect ${primaryMx}:25`,
-              }),
+              tested: false,
+              mxHost: primaryMx,
+              supportsStarttls: false,
+              error: 'MX assente o non risolto a IP pubblico: probe porta 25 saltato',
+              opensslCommand: `openssl s_client -starttls smtp -connect ${primaryMx}:25`,
+            }),
           checkDaneTlsa(primaryMx),
         ]);
         mxStarttls = starttlsRes;

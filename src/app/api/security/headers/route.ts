@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
-import { safeHttpProbe } from '@/lib/safe-http-probe';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
+import { safeHttpProbe, safeFetch } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,26 +44,27 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedTarget = validation.data;
+  const validatedTarget = validation.target;
   const url = validatedTarget.startsWith('http') ? validatedTarget : `https://${validatedTarget}`;
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     let headerMap: Record<string, string> = {};
 
     // 1. Tentativo con fetch HEAD standard
     try {
-      const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      const response = await safeFetch(url, { method: 'HEAD', lookup });
       response.headers.forEach((val, key) => {
         headerMap[key.toLowerCase()] = val;
       });
     } catch {
       // 2. Fallback resiliente con safeHttpProbe (gestisce certificati self-signed o server che rifiutano HEAD)
-      const probeRes = await safeHttpProbe(url, { method: 'GET', timeout: 5000 });
+      const probeRes = await safeHttpProbe(url, { method: 'GET', timeout: 5000, lookup });
       for (const [key, val] of Object.entries(probeRes.headers)) {
         if (typeof val === 'string') {
           headerMap[key.toLowerCase()] = val;
@@ -119,14 +121,14 @@ export async function GET(req: Request) {
 
     const hasEolCritical = disclosures.some(d => d.risk === 'critical' || (d.isEol && d.risk === 'high'));
 
-    const finalStatus = hasEolCritical 
-      ? 'fail' 
+    const finalStatus = hasEolCritical
+      ? 'fail'
       : (missingCount > 2 ? 'fail' : (missingCount > 0 || disclosures.some(d => d.hasVersion) ? 'warning' : 'pass'));
 
     return NextResponse.json({
       status: finalStatus,
-      message: missingCount === 0 
-        ? 'Tutti gli header di sicurezza sono presenti.' 
+      message: missingCount === 0
+        ? 'Tutti gli header di sicurezza sono presenti.'
         : `Mancano ${missingCount} header di sicurezza raccomandati.`,
       audit,
       informationDisclosure: {
@@ -135,8 +137,8 @@ export async function GET(req: Request) {
         eolDetected: disclosures.filter(d => d.isEol),
         curlCommand: `curl -I -sS "${url}" | grep -Ei "^(Server|X-Powered-By|X-AspNet|Via):"`
       },
-      recommendation: missingCount > 0 
-        ? 'Configura gli header mancanti e rimuovi i banner tecnologici (ServerTokens Prod / expose_php Off) sul tuo web server.' 
+      recommendation: missingCount > 0
+        ? 'Configura gli header mancanti e rimuovi i banner tecnologici (ServerTokens Prod / expose_php Off) sul tuo web server.'
         : 'Ottimo lavoro! Gli header di sicurezza sono configurati correttamente.'
     });
   } catch (error) {

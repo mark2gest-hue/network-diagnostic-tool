@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
 import { safeHttpProbe } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
@@ -9,13 +10,14 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedTarget = validation.data;
+  const validatedTarget = validation.target;
   const baseUrl = validatedTarget.startsWith('http') ? validatedTarget : `https://${validatedTarget}`;
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     const testOrigin = 'https://evil-attacker-website.com';
@@ -26,6 +28,7 @@ export async function GET(req: Request) {
         'Access-Control-Request-Method': 'GET'
       },
       timeout: 5000,
+      lookup,
     });
 
     const getHeader = (name: string) => {

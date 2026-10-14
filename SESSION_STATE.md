@@ -1,5 +1,34 @@
 # SESSION_STATE.md
 
+## ⚠️ SESSIONE IN CORSO (riprendere da qui)
+**Data ultimo aggiornamento**: 2026-10-14
+
+**OBIETTIVO ATTUALE**: Hardening sicurezza SSRF/TOCTOU + fix IPv6 — **COMPLETATO** (tsc = 0 errori).
+
+### Punti 1 e 2 — COMPLETATI
+
+**Punto 1 — TOCTOU / DNS Rebinding (pinning IP):**
+- [x] `src/lib/security-guard.ts`: `createPinnedLookup(resolvedIps)` + type `PinnedLookupFn`.
+- [x] `src/lib/safe-http-probe.ts`: riscritto. `safeHttpProbe` con `lookup` opzionale + nuova `safeFetch()` (drop-in fetch, segue redirect solo same-host).
+- [x] Endpoint collegati al pinning (tutti):
+  - tests: http, ssl, http-protocols, ttfb, ping, traceroute, portscan (già ok)
+  - security: headers, tls, ports, email-armor (MX/NS via `hostIsPublic`→IP + `createPinnedLookup`)
+  - vulnerabilities: https, waf, cors, cookies
+  - pentest/run (safeFetch con lookup)
+
+**Punto 2 — IPv6:**
+- [x] `src/lib/validators.ts`: `sanitizeInput` gestisce IPv6, `isIPv6Literal()`, `targetSchema` aggiornato, `ipSchema` resta IPv4-only (RBL).
+
+### Verificato
+- [x] `npx tsc --noEmit` → 0 errori.
+- [x] Test funzionali anti-SSRF via curl (tutti attesi 400): `169.254.169.254`, `localhost`, `127.0.0.1`, `[::1]`, `10.0.0.1`, `192.168.1.1`, `0.0.0.0`, `169.254.169.254:80`.
+- [x] Controllo positivo: `example.com` → 200. Messaggio pulito: "Protezione SSRF: Gli indirizzi IP privati non sono consentiti."
+
+### Resta (opzionale)
+- Cyber Shield (progetto separato): rimuovere `scripts/setup-wireguard.py` (mai confermato).
+
+---
+
 ## 1. Obiettivo della sessione
 - **Progetto**: [NetworkDiag Ops Pro & Vulnerability Scanner](file:///Users/marco/Sviluppo/Progetti/Progetto%20network-diagnostic-tool/README.md)
 - **Stack**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Turso (LibSQL), shadcn/ui
@@ -10,6 +39,11 @@
 ## 2. Stato di avanzamento
 
 ### Completato (Done)
+- [x] Modulo Autonomo "Bot & AI Defense Shield" (Blueprint Node Isolato):
+  - **Engine di Regole & Hardening Reale (`src/lib/bot-ai-defense-engine.ts`)**: Audit passivo/empirico su 12 crawler AI (GPTBot, ClaudeBot, Bytespider, CCBot, etc.), WAF fingerprinting e generazione configurazioni operative (Cloudflare WAF Expression Rules, Nginx rate-limiting & Bot Trap, robots.txt difensivo MITRE ATLAS AML.T0053).
+  - **API Route dedicata (`src/app/api/defense/bot-ai/route.ts`)**: Probing HTTP sicuro, normalizzazione target, ScopeEngine perimetrale e protezione demo-mode via `middleware.ts`.
+  - **Componente UI Standalone (`src/components/dashboard/BotAiDefenseModule.tsx`)**: Dashboard a sé stante con doppia vista (audit crawler a semaforo + generatore e copia 1-click di regole WAF/Nginx).
+  - **Typecheck**: `npx tsc --noEmit` completato con 0 errori.
 - [x] Struttura base del progetto Next.js 14 con TypeScript e Tailwind CSS
 - [x] Suite diagnostica esterna (DNS globale, TTFB/Waterfall, HTTP/2 & 3, SSL, WHOIS, Port scanner, Traceroute, Reverse DNS)
 - [x] Suite diagnostica interna / client (Speedtest, Scansione LAN/ARP, IP Pubblico/Privato WebRTC, packet loss)
@@ -84,6 +118,10 @@
    - Step 3 (parziale): chiave `emailArmor` in risk-engine; email-armor: probe MX/NS solo su IP pubblici (`hostIsPublic`), Dangling MX solo NXDOMAIN (null-MX escluso), DANE richiede TLSA(type 52)+AD, nessun punteggio per controlli non eseguiti (porta 25 filtrata, AXFR saltato, `scoreNote`); OCSP rinominato "Stapling / Responder" e assenza = info. `tsc` OK, curl aiutiamoci.cloud OK.
    - Step 3b `pentest/run`: smuggling → 'skipped' (fetch non invia TE+CL, nessun verdetto), takeover solo NXDOMAIN (altri errori 'skipped'), probe 3/9/13 'skipped' se host irraggiungibile, match regex specifici (.env, .git, actuator, _cat, traefik). `tsc` OK; live aiutiamoci.cloud: 12 passed, 1 skipped.
    - Residuo: firme takeover deboli (subdomains), regola EOL ASP.NET + liste statiche, SSRF target in `pentest/run` (accettato: uso solo locale), probe 10 euristica a riflessione. Registrazione `/api/auth/register` aperta in demo (da restringere).
+- [x] Fix compilazione CSS / Tailwind: risolto errore `Module parse failed: Unexpected character '@'` su `globals.css` allineando la configurazione PostCSS a ES Module (`postcss.config.mjs`) in coerenza con `next.config.mjs`, rimossa la configurazione legacy CJS (`postcss.config.js`) e pulita la cache `.next`. Terminato il vecchio processo `next dev` (PID 27974/27975) che tratteneva in memoria il blocco FOUC (`body{display:none}`) e riavviato il server di sviluppo pulito sulla porta 3004 (200 OK confermato su `/` e su foglio di stile `layout.css`).
+- [x] Bypass login in locale (`src/middleware.ts`): escluso il redirect a `/login` e il blocco 403 delle scansioni per connessioni provenienti da `localhost`, `127.0.0.1` e reti locali (`.local`). Accesso diretto e scansioni attive garantiti al 100% in sviluppo locale, preservando la protezione demo-mode solo per host pubblici / VPS.
+- [x] Sblocco Scansioni Reali in Locale vs Demo in Produzione: reso dinamico `isDemoMode` in `src/app/page.tsx` (sempre disattivo su `localhost` e `127.0.0.1` per mostrare barra del target e tutti i tab di scansione live), bypass auth locale per `/api/history` e `/api/assets` in `src/middleware.ts` e abilitata `ALLOW_LOCAL_DIAGNOSTICS` di default in sviluppo (`NODE_ENV !== 'production'`) in `src/lib/security-guard.ts`.
+- [x] Hardening Test Reali & Sblocco Completo Locale: implementato fallback automatico a sessione locale in `src/lib/auth.ts` (`userId: 'local'`) risolvendo i 401 su History, Asset e Webhook in locale; aggiunta validazione `validateSafeTarget` su `/api/pentest/run`; bloccata la registrazione non autorizzata in demo mode e rimosso leak env in `/api/auth/register`; corretto escaping JSX in `PentestSection.tsx`.
 
 ### In corso (In Progress)
 - [ ] Monitoraggio continuo e rifiniture di produzione

@@ -45,8 +45,8 @@ export interface RemediationItem {
   nistCsf?: string;
 }
 
-export function ExecutiveRemediationSummary({ 
-  target, 
+export function ExecutiveRemediationSummary({
+  target,
   perspectiveMode = 'executive',
   onOpenExportModal,
   demoAssessment,
@@ -99,8 +99,8 @@ export function ExecutiveRemediationSummary({
     );
     const hasPentest = Boolean(
       pentestResults &&
-        ((pentestResults.tests && pentestResults.tests.length > 0) ||
-          (Array.isArray(pentestResults) && pentestResults.length > 0))
+      ((pentestResults.tests && pentestResults.tests.length > 0) ||
+        (Array.isArray(pentestResults) && pentestResults.length > 0))
     );
     return rawEntries.length > 0 || secEntries.length > 0 || vulnEntries.length > 0 || hasPentest;
   }, [results, securityResults, vulnerabilityResults, pentestResults, demoAssessment]);
@@ -212,27 +212,49 @@ export function ExecutiveRemediationSummary({
     const netFindings = findings.filter(f => f.id.includes('port') || f.id.includes('blacklist') || f.id.includes('latency') || f.category === 'availability');
     const appFindings = findings.filter(f => f.id.includes('file') || f.id.includes('cors') || f.id.startsWith('pentest'));
 
+    // Distingue "testato e pulito" da "mai eseguito": evita di dichiarare conformità senza aver eseguito i moduli.
+    const isAreaTested = (keys: string[]) => {
+      if (demoAssessment) return true;
+      const sources = [results, securityResults, vulnerabilityResults] as (Record<string, unknown> | null | undefined)[];
+      return keys.some((key) =>
+        sources.some((src) => {
+          const v = src?.[key] as { status?: string } | null | undefined;
+          if (!v) return false;
+          const s = String(v.status || '').toLowerCase();
+          return s !== '' && s !== 'idle' && s !== 'running' && s !== 'error';
+        })
+      );
+    };
+    const emailExecuted = isAreaTested(['dmarc', 'spf', 'dkim', 'emailArmor']);
+    const webExecuted = isAreaTested(['headers', 'tls', 'ssl', 'http', 'https', 'cookies']);
+    const netExecuted = isAreaTested(['portscan', 'ports', 'rbl', 'blacklist']);
+    const appExecuted = isAreaTested(['files', 'secrets', 'cors', 'directory-listing']);
+
     return [
       {
         category: 'Autenticazione Email & Postura Dominio',
         title: emailFindings.length > 0 ? emailFindings[0].title : 'Configurazione SPF, DKIM & DMARC',
-        status: emailFindings.length > 0 ? (emailFindings.some(f => f.severity === 'high') ? 'Intervento Richiesto' : 'In Corso di Hardening') : 'Conforme Standard Moderni',
-        statusClass: emailFindings.length > 0 ? 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]' : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
-        explanation: emailFindings.length > 0 
-          ? emailFindings.map(f => f.description).join(' ') 
-          : 'I record di autenticazione email (SPF, DKIM, DMARC) risultano configurati o non sono state riscontrate anomalie nei controlli passivi.',
-        action: emailFindings.length > 0 
-          ? (emailFindings[0].remediation?.action || 'Rivedere i record DNS autorizzativi.') 
+        status: emailFindings.length > 0 ? (emailFindings.some(f => f.severity === 'high') ? 'Intervento Richiesto' : 'In Corso di Hardening') : (emailExecuted ? 'Conforme Standard Moderni' : 'Non Verificato'),
+        statusClass: emailFindings.length > 0 ? 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]' : (emailExecuted ? 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]' : 'bg-slate-500/20 text-slate-300 border-slate-600'),
+        explanation: emailFindings.length > 0
+          ? emailFindings.map(f => f.description).join(' ')
+          : emailExecuted
+            ? 'I record di autenticazione email (SPF, DKIM, DMARC) risultano configurati e non sono state riscontrate anomalie nei controlli eseguiti.'
+            : 'I moduli di autenticazione email (SPF, DKIM, DMARC) non sono stati eseguiti in questa sessione: postura non verificata.',
+        action: emailFindings.length > 0
+          ? (emailFindings[0].remediation?.action || 'Rivedere i record DNS autorizzativi.')
           : 'Mantenere il monitoraggio periodico dei flussi di recapito email.'
       },
       {
         category: 'Web Server Hardening & Crittografia',
         title: webFindings.length > 0 ? webFindings[0].title : 'Protezione HTTPS, HSTS & Headers',
-        status: webFindings.length > 0 ? (webFindings.some(f => f.severity === 'high' || f.severity === 'critical') ? 'Intervento Richiesto' : 'Migliorabile') : 'Conforme Standard Moderni',
-        statusClass: webFindings.length > 0 ? 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]' : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        status: webFindings.length > 0 ? (webFindings.some(f => f.severity === 'high' || f.severity === 'critical') ? 'Intervento Richiesto' : 'Migliorabile') : (webExecuted ? 'Conforme Standard Moderni' : 'Non Verificato'),
+        statusClass: webFindings.length > 0 ? 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]' : (webExecuted ? 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]' : 'bg-slate-500/20 text-slate-300 border-slate-600'),
         explanation: webFindings.length > 0
           ? webFindings.map(f => f.description).join(' ')
-          : 'Il server applica parametri crittografici TLS validi e gli header protettivi fondamentali sono attivi.',
+          : webExecuted
+            ? 'Il server applica parametri crittografici TLS validi e gli header protettivi fondamentali sono attivi.'
+            : 'I controlli di hardening web (HSTS, CSP, TLS, cookie) non sono stati eseguiti in questa sessione: postura non verificata.',
         action: webFindings.length > 0
           ? (webFindings[0].remediation?.action || 'Aggiornare la configurazione del web server.')
           : 'Nessuna azione urgente richiesta. Verificare periodicamente il ciclo di rinnovo TLS.'
@@ -240,11 +262,13 @@ export function ExecutiveRemediationSummary({
       {
         category: 'Infrastruttura di Rete & Porte Esterne',
         title: netFindings.length > 0 ? netFindings[0].title : 'Superficie di Rete & Firewall',
-        status: netFindings.length > 0 ? (netFindings.some(f => f.severity === 'critical') ? 'Criticità Esposizione' : 'Attenzione') : 'Nessuna Porta Critica Rilevata',
-        statusClass: netFindings.length > 0 ? (netFindings.some(f => f.severity === 'critical') ? 'bg-[#991b1b]/20 text-[#f87171] border-[#7f1d1d]' : 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]') : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        status: netFindings.length > 0 ? (netFindings.some(f => f.severity === 'critical') ? 'Criticità Esposizione' : 'Attenzione') : (netExecuted ? 'Nessuna Porta Critica Rilevata' : 'Non Verificato'),
+        statusClass: netFindings.length > 0 ? (netFindings.some(f => f.severity === 'critical') ? 'bg-[#991b1b]/20 text-[#f87171] border-[#7f1d1d]' : 'bg-[#d97706]/20 text-[#fbbf24] border-[#b45309]') : (netExecuted ? 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]' : 'bg-slate-500/20 text-slate-300 border-slate-600'),
         explanation: netFindings.length > 0
           ? netFindings.map(f => f.description).join(' ')
-          : 'I controlli sulle porte standard e sulle blacklist DNSBL non hanno evidenziato servizi database o intermediari esposti senza autorizzazione.',
+          : netExecuted
+            ? 'I controlli sulle porte standard e sulle blacklist DNSBL non hanno evidenziato servizi database o intermediari esposti senza autorizzazione.'
+            : 'Il port scan e le verifiche di blacklist non sono stati eseguiti in questa sessione: superficie di rete non verificata.',
         action: netFindings.length > 0
           ? (netFindings[0].remediation?.action || 'Restringere le regole firewall su IP fidati.')
           : 'Mantenere attive le regole restrittive di default sul firewall perimetrale.'
@@ -252,11 +276,13 @@ export function ExecutiveRemediationSummary({
       {
         category: 'Integrità Applicativa & File Sensibili',
         title: appFindings.length > 0 ? appFindings[0].title : 'Superficie Applicativa & Leak',
-        status: appFindings.length > 0 ? (appFindings.some(f => f.severity === 'critical') ? 'Vulnerabilità Confermata' : 'Attenzione Richiesta') : 'Nessun Leak Rilevato',
-        statusClass: appFindings.length > 0 ? 'bg-[#991b1b]/20 text-[#f87171] border-[#7f1d1d]' : 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]',
+        status: appFindings.length > 0 ? (appFindings.some(f => f.severity === 'critical') ? 'Vulnerabilità Confermata' : 'Attenzione Richiesta') : (appExecuted ? 'Nessun Leak Rilevato' : 'Non Verificato'),
+        statusClass: appFindings.length > 0 ? 'bg-[#991b1b]/20 text-[#f87171] border-[#7f1d1d]' : (appExecuted ? 'bg-[#064e3b]/30 text-[#34d399] border-[#059669]' : 'bg-slate-500/20 text-slate-300 border-slate-600'),
         explanation: appFindings.length > 0
           ? appFindings.map(f => f.description).join(' ')
-          : 'Non sono stati riscontrati file di configurazione (.env, .git), backup di database o misconfigurazioni CORS con credenziali riflettute.',
+          : appExecuted
+            ? 'Non sono stati riscontrati file di configurazione (.env, .git), backup di database o misconfigurazioni CORS con credenziali riflettute.'
+            : 'I controlli su file sensibili e configurazione CORS non sono stati eseguiti in questa sessione: superficie applicativa non verificata.',
         action: appFindings.length > 0
           ? (appFindings[0].remediation?.action || 'Rimuovere i file esposti e correggere i permessi web.')
           : 'Mantenere bloccate le estensioni critiche nella configurazione del reverse proxy.'
@@ -331,8 +357,8 @@ export function ExecutiveRemediationSummary({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    const scoreText = hasExecutedTests 
-      ? `Punteggio Postura: ${assessment.overallScore}/100 (Grado ${assessment.grade})` 
+    const scoreText = hasExecutedTests
+      ? `Punteggio Postura: ${assessment.overallScore}/100 (Grado ${assessment.grade})`
       : 'Punteggio Postura: In attesa di scansione';
     const coverageText = `Copertura Esecutiva: ${assessment.coverage?.coveragePercentage ?? 100}%`;
     doc.text(`Target: ${target} | ${scoreText} | ${coverageText}`, 14, 28);
@@ -346,7 +372,7 @@ export function ExecutiveRemediationSummary({
     doc.setFont('helvetica', 'bold');
     doc.text('SINTESI ESECUTIVA & INTERPRETAZIONE DELLA POSTURA:', 18, 55);
     doc.setFont('helvetica', 'normal');
-    
+
     const summaryLines = doc.splitTextToSize(assessment.summary || 'Valutazione completata senza anomalie bloccanti.', pageWidth - 36);
     doc.text(summaryLines, 18, 62);
 
@@ -398,15 +424,15 @@ export function ExecutiveRemediationSummary({
     doc.setFont('helvetica', 'normal');
     doc.text(`Interventi raccomandati basati sulle evidenze riscontrate per ${target}`, 14, 25);
 
-    const remediationTableData = sortedRemediations.length > 0 
+    const remediationTableData = sortedRemediations.length > 0
       ? sortedRemediations.map(r => [
-          r.severity.toUpperCase(),
-          r.title,
-          `${r.mitreDefend || 'D3-AHA'} / ${r.cwe || 'N/A'}`,
-          r.solutionType,
-          r.businessImpact,
-          r.solutionCommand
-        ])
+        r.severity.toUpperCase(),
+        r.title,
+        `${r.mitreDefend || 'D3-AHA'} / ${r.cwe || 'N/A'}`,
+        r.solutionType,
+        r.businessImpact,
+        r.solutionCommand
+      ])
       : [['INFO', 'Nessuna criticità identificata', 'N/A', 'Audit Positivo', 'Nessun intervento bloccante necessario', 'Superficie conforme ai controlli eseguiti']];
 
     autoTable(doc, {
@@ -504,27 +530,27 @@ export function ExecutiveRemediationSummary({
             !hasExecutedTests
               ? `In attesa di esecuzione diagnostica per ${target}.`
               : assessment.overallScore >= 85
-              ? 'La postura del dominio risulta solida e conforme.'
-              : assessment.overallScore >= 60
-              ? 'Attenzione richiesta su alcuni parametri di sicurezza.'
-              : 'Rilevate criticità significative che richiedono bonifica.'
+                ? 'La postura del dominio risulta solida e conforme.'
+                : assessment.overallScore >= 60
+                  ? 'Attenzione richiesta su alcuni parametri di sicurezza.'
+                  : 'Rilevate criticità significative che richiedono bonifica.'
           }
           tone={
             !hasExecutedTests
               ? 'neutral'
               : assessment.overallScore >= 85
-              ? 'ok'
-              : assessment.overallScore >= 60
-              ? 'warn'
-              : 'crit'
+                ? 'ok'
+                : assessment.overallScore >= 60
+                  ? 'warn'
+                  : 'crit'
           }
         >
           <p className="text-[0.9375rem] text-ink-2">
             {!hasExecutedTests
               ? 'Avvia i moduli diagnostici per calcolare il punteggio di esposizione e la matrice delle raccomandazioni.'
               : findings.length === 0
-              ? 'Nessun problema bloccante riscontrato nelle verifiche effettuate.'
-              : `Rilevate ${findings.length} osservazioni. Consulta i consigli prioritari sotto da girare al team IT.`}
+                ? 'Nessun problema bloccante riscontrato nelle verifiche effettuate.'
+                : `Rilevate ${findings.length} osservazioni. Consulta i consigli prioritari sotto da girare al team IT.`}
           </p>
           {hasExecutedTests && (
             <details className="mt-3 cursor-pointer text-xs text-accent">
@@ -544,7 +570,7 @@ export function ExecutiveRemediationSummary({
       {/* Cosa chiedere al team IT (3 azioni principali) */}
       <div className="space-y-4">
         <h2 className="text-[1.0625rem] font-bold text-foreground">Cosa chiedere al team IT</h2>
-        
+
         <div className="space-y-3">
           {topActionCards.map((card, idx) => (
             <ActionCard
@@ -618,11 +644,10 @@ export function ExecutiveRemediationSummary({
                   key={sev}
                   type="button"
                   onClick={() => setFilterSeverity(sev)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all ${
-                    filterSeverity === sev
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all ${filterSeverity === sev
                       ? 'bg-accent-bg text-accent border-accent/40'
                       : 'bg-surface text-ink-2 border-border hover:bg-hover'
-                  }`}
+                    }`}
                 >
                   {sev.toUpperCase()}
                 </button>

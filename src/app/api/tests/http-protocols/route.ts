@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
+import { safeFetch } from '@/lib/safe-http-probe';
 import tls from 'tls';
 
 export const dynamic = 'force-dynamic';
@@ -9,12 +11,14 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const cleanTarget = validation.data;
+  const cleanTarget = validation.target;
+  // Pinna il DNS agli IP validati (anti TOCTOU/DNS Rebinding)
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     // Negoziamo ALPN per verificare h2 / http/1.1
@@ -28,7 +32,8 @@ export async function GET(req: Request) {
         port: 443,
         servername: cleanTarget,
         ALPNProtocols: ['h2', 'http/1.1'],
-        timeout: 5000
+        timeout: 5000,
+        lookup,
       }, () => {
         const alpn = socket.alpnProtocol;
         const proto = socket.getProtocol() || 'TLS';
@@ -54,7 +59,7 @@ export async function GET(req: Request) {
     let supportsH3 = false;
     let altSvcHeader = '';
     try {
-      const res = await fetch(`https://${cleanTarget}`, { method: 'HEAD' });
+      const res = await safeFetch(`https://${cleanTarget}`, { method: 'HEAD', lookup });
       altSvcHeader = res.headers.get('alt-svc') || '';
       supportsH3 = altSvcHeader.includes('h3');
     } catch {
@@ -75,11 +80,11 @@ export async function GET(req: Request) {
       cipher: alpnResult.cipher,
       altSvcHeader: altSvcHeader || 'Non presente',
       protocols: protocolsList,
-      message: supportsH3 
+      message: supportsH3
         ? 'Supporto all\'avanguardia: Attivo sia HTTP/2 che HTTP/3 (QUIC over UDP).'
         : supportsH2
-        ? 'Supporto moderno: HTTP/2 attivo per multiplexing e prestazioni ottimali.'
-        : 'Server limitato a HTTP/1.1 legacy.',
+          ? 'Supporto moderno: HTTP/2 attivo per multiplexing e prestazioni ottimali.'
+          : 'Server limitato a HTTP/1.1 legacy.',
       recommendation: supportsH2 || supportsH3
         ? 'Configurazione protocolli web eccellente.'
         : 'Abilita HTTP/2 o HTTP/3 nel web server/CDN per velocizzare i tempi di caricamento delle pagine.'

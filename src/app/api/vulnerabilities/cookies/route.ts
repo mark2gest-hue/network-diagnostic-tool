@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
 import { safeHttpProbe } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
@@ -9,26 +10,28 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedTarget = validation.data;
+  const validatedTarget = validation.target;
   const baseUrl = validatedTarget.startsWith('http') ? validatedTarget : `https://${validatedTarget}`;
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     const res = await safeHttpProbe(baseUrl, {
       method: 'GET',
       timeout: 5000,
+      lookup,
     });
 
     const rawCookies = res.headers['set-cookie'];
     const setCookieHeaders = Array.isArray(rawCookies)
       ? rawCookies
       : typeof rawCookies === 'string'
-      ? [rawCookies]
-      : [];
+        ? [rawCookies]
+        : [];
 
     if (setCookieHeaders.length === 0) {
       return NextResponse.json({
@@ -73,7 +76,7 @@ export async function GET(req: Request) {
       cookiesFound: analyzedCookies.length,
       cookies: analyzedCookies,
       totalIssues,
-      message: totalIssues === 0 
+      message: totalIssues === 0
         ? `Tutti i ${analyzedCookies.length} cookie analizzati contengono i flag di sicurezza corretti.`
         : `Rilevate ${totalIssues} debolezze di sicurezza nei cookie analizzati.`,
       recommendation: totalIssues > 0

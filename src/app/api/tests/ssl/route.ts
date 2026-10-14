@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import tls from 'tls';
-import { domainSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const domain = searchParams.get('domain');
 
-  const validation = domainSchema.safeParse(domain);
+  const validation = await validateSafeTarget(domain);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+
+  // Pinna il DNS agli IP validati (anti TOCTOU/DNS Rebinding)
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     let ocspStapled = false;
@@ -17,10 +21,11 @@ export async function GET(req: Request) {
     let certErrorCode: string | null = null;
 
     const cert = await new Promise<tls.PeerCertificate | null>((resolve) => {
-      const socket = tls.connect(443, domain!, { 
-        servername: domain!, 
+      const socket = tls.connect(443, validation.target, {
+        servername: validation.target,
         rejectUnauthorized: false,
         requestOCSP: true,
+        lookup,
       } as tls.ConnectionOptions & { requestOCSP?: boolean }, () => {
         const peerCert = socket.getPeerCertificate(true);
         socket.end();
@@ -55,7 +60,7 @@ export async function GET(req: Request) {
         securityOutcome: 'inconclusive',
         error: certError || 'Impossibile completare la negoziazione TLS',
         errorCode: certErrorCode,
-        message: isUnreachable 
+        message: isUnreachable
           ? `Porta 443 non raggiungibile o filtrata (${certError}). Servizio HTTPS presumibilmente non attivo su questo host.`
           : `Handshake crittografico non completato: ${certError}. Esito inconclusivo.`
       }, { status: 200 }); // Restituisce 200 per consentire la corretta interpretazione semantica nel client
@@ -109,15 +114,15 @@ export async function GET(req: Request) {
         message: ocspStapled
           ? 'OCSP Stapling attivo (risposta presente nell\'handshake; lo stato di revoca non è validato da questo test).'
           : ocspResponderUrl
-          ? `OCSP Stapling non attivo; il client interroga il responder ${ocspResponderUrl}`
-          : 'Nessun OCSP Stapling né responder AIA nel certificato (normale per CA che hanno dismesso OCSP, es. Let\'s Encrypt).',
-        opensslCommand: `openssl s_client -connect ${domain}:443 -status -servername ${domain}`,
+            ? `OCSP Stapling non attivo; il client interroga il responder ${ocspResponderUrl}`
+            : 'Nessun OCSP Stapling né responder AIA nel certificato (normale per CA che hanno dismesso OCSP, es. Let\'s Encrypt).',
+        opensslCommand: `openssl s_client -connect ${validation.target}:443 -status -servername ${validation.target}`,
       },
       message: isExpired
         ? `Certificato SSL/TLS scaduto il ${new Date(validTo).toLocaleDateString()}!`
         : daysRemaining < 15
-        ? `Certificato in scadenza tra ${daysRemaining} giorni.`
-        : `Certificato SSL/TLS valido (${daysRemaining} giorni residui).`
+          ? `Certificato in scadenza tra ${daysRemaining} giorni.`
+          : `Certificato SSL/TLS valido (${daysRemaining} giorni residui).`
     });
   } catch (error: any) {
     return NextResponse.json({

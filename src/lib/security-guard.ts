@@ -141,12 +141,77 @@ export interface TargetValidationResult {
   error?: string;
 }
 
+/** Tipo della funzione lookup che forza la risoluzione DNS sugli IP validati. */
+export type PinnedLookupFn = (hostname: string, options: unknown, callback: unknown) => void;
+
+/**
+ * Crea una funzione `lookup` che forza la risoluzione DNS verso gli IP già validati
+ * durante `validateExternalTarget`. Questo elimina la finestra TOCTOU / DNS Rebinding:
+ * anche se un attaccante modifica il record DNS tra la validazione e la connessione,
+ * il socket si connette SOLO agli IP pubblici precedentemente controllati.
+ *
+ * L'hostname originale (e quindi SNI + Host header) resta invariato, quindi funziona
+ * correttamente anche con siti frontati da CDN / virtual hosting.
+ *
+ * @returns una funzione lookup compatibile con net.connect / tls.connect / http.request,
+ *          oppure `undefined` se non ci sono IP validati su cui fare pinning (es. `.local`).
+ */
+export function createPinnedLookup(
+  resolvedIps: string[]
+): PinnedLookupFn | undefined {
+  const ips = resolvedIps.filter((ip) => net.isIP(ip));
+  if (ips.length === 0) {
+    return undefined;
+  }
+
+  // Preferisce IPv4 (compatibilità massima) pur mantenendo gli IPv6 come fallback.
+  const ordered = [...ips].sort((a, b) => {
+    const aV4 = net.isIPv4(a) ? 0 : 1;
+    const bV4 = net.isIPv4(b) ? 0 : 1;
+    return aV4 - bV4;
+  });
+
+  return function pinnedLookup(hostname: string, options: unknown, callback: unknown) {
+    // Supporta entrambe le firme: lookup(hostname, callback) e lookup(hostname, options, callback)
+    let cb = callback as (err: NodeJS.ErrnoException | null, address?: string, family?: number) => void;
+    let opts: { family?: number; all?: boolean } | undefined;
+    if (typeof options === 'function') {
+      cb = options as typeof cb;
+      opts = undefined;
+    } else {
+      opts = options as { family?: number; all?: boolean } | undefined;
+    }
+
+    const addresses = ordered.map((ip) => ({
+      address: ip,
+      family: (net.isIPv6(ip) ? 6 : 4) as number,
+    }));
+
+    const wantFamily = opts && opts.family;
+    const filtered = wantFamily ? addresses.filter((a) => a.family === wantFamily) : addresses;
+
+    if (filtered.length === 0) {
+      const err: NodeJS.ErrnoException = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
+      err.code = 'ENOTFOUND';
+      return cb(err);
+    }
+
+    if (opts && opts.all) {
+      return cb(null, filtered as unknown as string);
+    }
+
+    const first = filtered[0];
+    return cb(null, first.address, first.family);
+  };
+}
+
 /**
  * Modalità locale sul campo: permette di diagnosticare server, router, NAS e IP privati
  * dei clienti (192.168.x.x, 10.x.x.x, localhost, .local) SOLO se abilitata esplicitamente.
  * Sicurezza fail-closed: disattivata di default in produzione.
  */
-export const ALLOW_LOCAL_DIAGNOSTICS = process.env.ALLOW_LOCAL_DIAGNOSTICS?.toLowerCase() === 'true';
+export const ALLOW_LOCAL_DIAGNOSTICS =
+  process.env.ALLOW_LOCAL_DIAGNOSTICS?.toLowerCase() === 'true';
 
 /**
  * Valida un target (IP o Dominio) verificando che esista e sia sintatticamente corretto.

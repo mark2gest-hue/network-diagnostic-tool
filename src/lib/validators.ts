@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { isPrivateOrReservedIP, isInternalHostname, validateExternalTarget, ALLOW_LOCAL_DIAGNOSTICS } from './security-guard';
 
+const IPV4_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
+/**
+ * Rileva un IPv6 letterale "nudo" (senza parentesi quadre), es. 2001:db8::1 oppure
+ * la forma estesa 2001:db8:0:0:0:0:0:1. Richiede solo caratteri esadecimali e due punti,
+ * con almeno 2 due punti (un hostname:porta ha un solo due punto).
+ */
+function isIPv6Literal(str: string): boolean {
+  if (!/^[0-9a-fA-F:]+$/.test(str)) return false;
+  return str.includes('::') || (str.match(/:/g) || []).length >= 2;
+}
+
 function sanitizeInput(raw: unknown): string {
   if (typeof raw !== 'string') return '';
   let str = raw.trim();
@@ -8,14 +20,28 @@ function sanitizeInput(raw: unknown): string {
   if (/^[a-zA-Z]+:\/\//i.test(str)) {
     try {
       const parsed = new URL(str);
-      str = parsed.hostname;
+      str = parsed.hostname; // per IPv6 restituisce "[::1]" con le parentesi
     } catch {
       str = str.replace(/^[a-zA-Z]+:\/\//i, '');
     }
   }
   // Rimuove eventuale path finale (/qualcosa)
   str = str.split('/')[0];
-  // Rimuove eventuale porta (:443, :3100)
+
+  // IPv6 letterale tra parentesi: "[2001:db8::1]" oppure "[2001:db8::1]:443"
+  if (str.startsWith('[')) {
+    const end = str.indexOf(']');
+    if (end !== -1) {
+      return str.slice(1, end).trim();
+    }
+  }
+
+  // IPv6 letterale "nudo": 2001:db8::1 (non deve essere troncato dalla rimozione porta)
+  if (isIPv6Literal(str)) {
+    return str;
+  }
+
+  // Rimuove eventuale porta (:443, :3100) — solo per hostname o IPv4
   str = str.split(':')[0];
   return str.trim();
 }
@@ -45,8 +71,8 @@ export const ipSchema = z.preprocess(
   z
     .string()
     .regex(
-      /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
-      'Indirizzo IPv4 non valido'
+      IPV4_REGEX,
+      'Indirizzo IPv4 non valido (le blacklist RBL accettano solo IPv4)'
     )
     .refine((val) => ALLOW_LOCAL_DIAGNOSTICS || !isPrivateOrReservedIP(val), {
       message: 'Protezione SSRF: Gli indirizzi IP privati non sono consentiti.',
@@ -56,8 +82,8 @@ export const ipSchema = z.preprocess(
 export const targetSchema = z.preprocess(
   (val) => sanitizeInput(val),
   z.string().min(1, 'Inserisci un dominio o indirizzo IP').superRefine((val, ctx) => {
-    const isIp = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(val) || val.includes(':');
-    
+    const isIp = IPV4_REGEX.test(val) || isIPv6Literal(val);
+
     if (isIp) {
       if (!ALLOW_LOCAL_DIAGNOSTICS && isPrivateOrReservedIP(val)) {
         ctx.addIssue({

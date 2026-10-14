@@ -6,6 +6,11 @@ import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+  const isDemo = (process.env.APP_MODE ?? (process.env.NODE_ENV === 'production' ? 'demo' : 'local')) === 'demo';
+  if (isDemo) {
+    return NextResponse.json({ error: 'Registrazione disabilitata nella demo pubblica.' }, { status: 403 });
+  }
+
   try {
     const { email, password } = await req.json();
 
@@ -56,9 +61,8 @@ export async function POST(req: Request) {
     return response;
   } catch (error: unknown) {
     console.error('Registration error:', error);
-    const message = error instanceof Error ? error.message : 'Errore durante la registrazione';
     return NextResponse.json({ 
-      error: `Errore database: ${message}. Verifica TURSO_AUTH_TOKEN e TURSO_DATABASE_URL nel file .env.local` 
+      error: 'Errore durante la registrazione nel database.' 
     }, { status: 500 });
   }
 }

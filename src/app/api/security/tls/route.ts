@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import tls from 'tls';
 import dns from 'dns/promises';
-import { domainSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup, type PinnedLookupFn } from '@/lib/security-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,14 +13,15 @@ const TLS_VERSIONS = [
   { version: 'TLSv1', status: 'fail' }
 ];
 
-async function checkTlsVersion(domain: string, version: string): Promise<boolean> {
+async function checkTlsVersion(domain: string, version: string, lookup?: PinnedLookupFn): Promise<boolean> {
   return new Promise((resolve) => {
     try {
-      const socket = tls.connect(443, domain, { 
-        servername: domain, 
-        minVersion: version as tls.SecureVersion, 
+      const socket = tls.connect(443, domain, {
+        servername: domain,
+        minVersion: version as tls.SecureVersion,
         maxVersion: version as tls.SecureVersion,
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
+        lookup,
       }, () => {
         socket.end();
         resolve(true);
@@ -39,13 +41,14 @@ async function checkTlsVersion(domain: string, version: string): Promise<boolean
   });
 }
 
-async function checkWeakCipher(domain: string, ciphers: string): Promise<boolean> {
+async function checkWeakCipher(domain: string, ciphers: string, lookup?: PinnedLookupFn): Promise<boolean> {
   return new Promise((resolve) => {
     try {
       const socket = tls.connect(443, domain, {
         servername: domain,
         ciphers,
-        rejectUnauthorized: false
+        rejectUnauthorized: false,
+        lookup,
       }, () => {
         socket.end();
         resolve(true); // Handshake riuscito -> cifrario accettato (debolezza presente)
@@ -71,25 +74,26 @@ export async function GET(req: Request) {
   const rawDomain = searchParams.get('domain');
   const domain = (rawDomain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = domainSchema.safeParse(domain);
+  const validation = await validateSafeTarget(domain);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedDomain = validation.data;
+  const validatedDomain = validation.target;
+  const lookup = createPinnedLookup(validation.resolvedIps);
   try {
     // 1. Ispezione Versioni Protocollo TLS
     const results = await Promise.all(
       TLS_VERSIONS.map(async (v) => {
-        const supported = await checkTlsVersion(validatedDomain, v.version);
+        const supported = await checkTlsVersion(validatedDomain, v.version, lookup);
         return { ...v, supported };
       })
     );
 
     // 2. Ispezione Cifrari Deboli / Deprecati (3DES Sweet32 e RC4)
     const [supports3Des, supportsRc4] = await Promise.all([
-      checkWeakCipher(validatedDomain, 'DES-CBC3-SHA'),
-      checkWeakCipher(validatedDomain, 'RC4-SHA:RC4-MD5')
+      checkWeakCipher(validatedDomain, 'DES-CBC3-SHA', lookup),
+      checkWeakCipher(validatedDomain, 'RC4-SHA:RC4-MD5', lookup)
     ]);
 
     const weakCiphers = [

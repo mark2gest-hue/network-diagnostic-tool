@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import dns from 'dns/promises';
-import { targetSchema, formatZodError } from '@/lib/validators';
+import { validateSafeTarget } from '@/lib/validators';
+import { createPinnedLookup } from '@/lib/security-guard';
+import { safeFetch } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,25 +74,22 @@ export async function GET(req: Request) {
   const rawTarget = searchParams.get('target');
   const target = (rawTarget || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
 
-  const validation = targetSchema.safeParse(target);
+  const validation = await validateSafeTarget(target);
   if (!validation.success) {
-    return NextResponse.json({ error: formatZodError(validation.error) }, { status: 400 });
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const validatedTarget = validation.data;
+  const validatedTarget = validation.target;
   const baseUrl = validatedTarget.startsWith('http') ? validatedTarget : `https://${validatedTarget}`;
+  const lookup = createPinnedLookup(validation.resolvedIps);
 
   try {
     // 1. Rilevamento Firme WAF / CDN via HTTP Headers
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-
-    const res = await fetch(baseUrl, {
+    const res = await safeFetch(baseUrl, {
       method: 'GET',
-      signal: controller.signal,
+      lookup,
       redirect: 'follow'
     }).catch(() => null);
-    clearTimeout(timeout);
 
     const detectedWafs = res ? WAF_SIGNATURES.filter(waf => waf.headerCheck(res.headers)) : [];
     const serverHeader = res ? res.headers.get('server') || 'Nascosto / Non dichiarato' : 'Non raggiungibile';
