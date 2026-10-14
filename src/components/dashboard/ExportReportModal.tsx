@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { 
-  FileText, 
-  Download, 
-  Mail, 
-  MessageCircle, 
-  X, 
-  Building2, 
-  User, 
+import {
+  FileText,
+  Download,
+  Mail,
+  MessageCircle,
+  X,
+  Building2,
+  User,
   CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -167,8 +167,8 @@ export function ExportReportModal({
           const aRecs = payload.a || payload.records?.A || payload.A || payload.answers || [];
           const aStr = Array.isArray(aRecs) && aRecs.length > 0 ? `IPv4: ${aRecs.join(', ')}` : '';
           const mxRecs = payload.mx || [];
-          const mxStr = Array.isArray(mxRecs) && mxRecs.length > 0 
-            ? `MX: ${mxRecs.map((m: any) => typeof m === 'object' ? `${m.exchange} (${m.priority})` : String(m)).slice(0, 2).join(', ')}` 
+          const mxStr = Array.isArray(mxRecs) && mxRecs.length > 0
+            ? `MX: ${mxRecs.map((m: any) => typeof m === 'object' ? `${m.exchange} (${m.priority})` : String(m)).slice(0, 2).join(', ')}`
             : '';
           summaryDetail = [aStr, mxStr].filter(Boolean).join(' | ') || 'Record DNS acquisiti ed esaminati.';
         } else if (key === 'ttfb' && (payload.timings || payload.ttfb)) {
@@ -183,8 +183,8 @@ export function ExportReportModal({
           const openList = Array.isArray(portItems)
             ? portItems.filter((p: any) => p.open || p.status === 'open').map((p: any) => p.port)
             : (payload.openPorts || payload.open_ports || []);
-          summaryDetail = openList.length > 0 
-            ? `Porte aperte rilevate: ${openList.join(', ')}` 
+          summaryDetail = openList.length > 0
+            ? `Porte aperte rilevate: ${openList.join(', ')}`
             : 'Nessuna porta standard aperta';
         } else if (key === 'rbl' && (payload.listedIn || payload.blacklists)) {
           const count = payload.listedIn ? payload.listedIn.length : (payload.listedCount ?? 0);
@@ -266,13 +266,13 @@ export function ExportReportModal({
     const executedInternal = Object.entries(safeInternal).filter(([, v]) => v && v.status && v.status !== 'idle');
     const internalRows: string[][] = executedInternal.length > 0
       ? executedInternal.map(([k, v]) => {
-          const s = v?.status === 'pass' ? 'SUPERATO' : v?.status === 'warning' ? 'ATTENZIONE' : v?.status === 'fail' ? 'CRITICO' : v ? 'RILEVATO' : 'NON ESEGUITO';
-          const det = v?.result ? (typeof v.result === 'object' ? JSON.stringify(v.result) : String(v.result)) : (v?.error || '-');
-          return [k.replace(/_/g, ' ').toUpperCase(), s, det];
-        })
+        const s = v?.status === 'pass' ? 'SUPERATO' : v?.status === 'warning' ? 'ATTENZIONE' : v?.status === 'fail' ? 'CRITICO' : v ? 'RILEVATO' : 'NON ESEGUITO';
+        const det = v?.result ? (typeof v.result === 'object' ? JSON.stringify(v.result) : String(v.result)) : (v?.error || '-');
+        return [k.replace(/_/g, ' ').toUpperCase(), s, det];
+      })
       : [
-          ['Audit Perimetrale Esterno', 'NON APPLICABILE', 'Sessione diagnostica perimetrale esterna. I controlli LAN/WiFi/ARP richiedono operatore fisicamente presente nella subnet locale del cliente.']
-        ];
+        ['Audit Perimetrale Esterno', 'NON APPLICABILE', 'Sessione diagnostica perimetrale esterna. I controlli LAN/WiFi/ARP richiedono operatore fisicamente presente nella subnet locale del cliente.']
+      ];
 
     autoTable(doc, {
       startY: 34,
@@ -286,7 +286,7 @@ export function ExportReportModal({
 
     // Tabella 2.B: Security Audit & Email Posture
     const secStartY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10 : 120;
-    
+
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -295,42 +295,42 @@ export function ExportReportModal({
     const safeSec = securityResults || {};
     const secRows: string[][] = Object.entries(safeSec).length > 0
       ? Object.entries(safeSec).map(([k, v]) => {
-          const rawStatus = String(v?.status || '').toLowerCase();
-          const s = rawStatus === 'pass' || rawStatus === 'ok' ? 'CONFORME' : rawStatus === 'warning' || rawStatus === 'warn' ? 'ATTENZIONE' : rawStatus === 'fail' ? 'CRITICO' : 'VERIFICATO';
-          let det = '-';
-          const res = v?.result as Record<string, unknown> | undefined;
-          if (res && typeof res === 'object') {
-            if (res.multipleRecordsFound) {
-              det = `Rilevati ${Array.isArray(res.records) ? res.records.length : 2} record duplicati in DNS (Violazione RFC)`;
-            } else if (res.message) {
-              det = String(res.message);
-              if (res.policy) det += ` (Policy: ${res.policy})`;
-            } else if (res.detail) {
-              det = String(res.detail);
-            } else if (res.summary) {
-              det = String(res.summary);
-            } else if (k === 'leaks') {
-              const comb = res.combCount || 0;
-              const breaches = res.breachesCount || 0;
-              det = `${comb} credenziali COMB esposte, ${breaches} data breach storici rilevati`;
-            } else if (k === 'emailArmor') {
-              const mta = res.mtaSts as { mode?: string; enabled?: boolean } | undefined;
-              const sts = mta?.enabled ? `MTA-STS: ${mta.mode || 'Attivo'}` : 'MTA-STS: Assente';
-              const bimi = (res.bimi as { enabled?: boolean })?.enabled ? 'BIMI: Attivo' : 'BIMI: Assente';
-              const starttls = (res.starttls as { supportsStarttls?: boolean })?.supportsStarttls ? 'MX STARTTLS: Attivo' : '';
-              const dane = (res.dane as { enabled?: boolean })?.enabled ? 'DANE: Conforme' : '';
-              det = [sts, bimi, starttls, dane].filter(Boolean).join(' | ');
-            }
-          } else if (v?.message) {
-            det = String(v.message);
-          } else if (v?.error) {
-            det = `Errore verifica: ${v.error}`;
+        const rawStatus = String(v?.status || '').toLowerCase();
+        const s = rawStatus === 'pass' || rawStatus === 'ok' ? 'CONFORME' : rawStatus === 'warning' || rawStatus === 'warn' ? 'ATTENZIONE' : rawStatus === 'fail' ? 'CRITICO' : 'VERIFICATO';
+        let det = '-';
+        const res = v?.result as Record<string, unknown> | undefined;
+        if (res && typeof res === 'object') {
+          if (res.multipleRecordsFound) {
+            det = `Rilevati ${Array.isArray(res.records) ? res.records.length : 2} record duplicati in DNS (Violazione RFC)`;
+          } else if (res.message) {
+            det = String(res.message);
+            if (res.policy) det += ` (Policy: ${res.policy})`;
+          } else if (res.detail) {
+            det = String(res.detail);
+          } else if (res.summary) {
+            det = String(res.summary);
+          } else if (k === 'leaks') {
+            const comb = res.combCount || 0;
+            const breaches = res.breachesCount || 0;
+            det = `${comb} credenziali COMB esposte, ${breaches} data breach storici rilevati`;
+          } else if (k === 'emailArmor') {
+            const mta = res.mtaSts as { mode?: string; enabled?: boolean } | undefined;
+            const sts = mta?.enabled ? `MTA-STS: ${mta.mode || 'Attivo'}` : 'MTA-STS: Assente';
+            const bimi = (res.bimi as { enabled?: boolean })?.enabled ? 'BIMI: Attivo' : 'BIMI: Assente';
+            const starttls = (res.starttls as { supportsStarttls?: boolean })?.supportsStarttls ? 'MX STARTTLS: Attivo' : '';
+            const dane = (res.dane as { enabled?: boolean })?.enabled ? 'DANE: Conforme' : '';
+            det = [sts, bimi, starttls, dane].filter(Boolean).join(' | ');
           }
-          return [k.replace(/([A-Z])/g, ' $1').toUpperCase(), s, det];
-        })
+        } else if (v?.message) {
+          det = String(v.message);
+        } else if (v?.error) {
+          det = `Errore verifica: ${v.error}`;
+        }
+        return [k.replace(/([A-Z])/g, ' $1').toUpperCase(), s, det];
+      })
       : [
-          ['Postura Email & DNSSEC', 'NON ESEGUITO', 'Modulo di verifica SPF/DKIM/DMARC non incluso nella sessione corrente.']
-        ];
+        ['Postura Email & DNSSEC', 'NON ESEGUITO', 'Modulo di verifica SPF/DKIM/DMARC non incluso nella sessione corrente.']
+      ];
 
     autoTable(doc, {
       startY: secStartY + 4,
@@ -370,69 +370,69 @@ export function ExportReportModal({
     const safeVuln = vulnerabilityResults || {};
     const vulnRows: string[][] = Object.entries(safeVuln).length > 0
       ? Object.entries(safeVuln).map(([k, v]) => {
-          const rawStatus = String(v?.status || '').toLowerCase();
-          let s = 'NESSUNA ANOMALIA';
+        const rawStatus = String(v?.status || '').toLowerCase();
+        let s = 'NESSUNA ANOMALIA';
 
-          if (rawStatus === 'fail' || rawStatus === 'critical' || rawStatus === 'crit') {
+        if (rawStatus === 'fail' || rawStatus === 'critical' || rawStatus === 'crit') {
+          s = 'RISCHIO';
+        } else if (rawStatus === 'warning' || rawStatus === 'warn' || rawStatus === 'attention') {
+          s = 'ATTENZIONE';
+        } else if (rawStatus === 'pass' || rawStatus === 'success' || rawStatus === 'ok') {
+          s = 'NESSUNA ANOMALIA';
+        } else if (!rawStatus || rawStatus === 'idle' || rawStatus === 'skipped') {
+          s = 'NON ESEGUITO';
+        } else if (rawStatus === 'error') {
+          s = 'ERRORE SCAN';
+        }
+
+        let det = 'Scansione endpoint eseguita con successo';
+        if (k === 'files') {
+          const rawExposed = (v?.result?.exposedFiles || []) as Array<{ path?: string; risk?: string }>;
+          const realExposed = rawExposed.filter(f => {
+            const p = (f.path || '').toLowerCase();
+            return !p.includes('robots.txt') && !p.includes('security.txt');
+          });
+
+          if (realExposed.length > 0) {
             s = 'RISCHIO';
-          } else if (rawStatus === 'warning' || rawStatus === 'warn' || rawStatus === 'attention') {
-            s = 'ATTENZIONE';
-          } else if (rawStatus === 'pass' || rawStatus === 'success' || rawStatus === 'ok') {
+            const names = realExposed.map(f => f.path).slice(0, 3).join(', ');
+            det = `Rilevati ${realExposed.length} file sensibili esposti (${names})`;
+          } else {
             s = 'NESSUNA ANOMALIA';
-          } else if (!rawStatus || rawStatus === 'idle' || rawStatus === 'skipped') {
-            s = 'NON ESEGUITO';
-          } else if (rawStatus === 'error') {
-            s = 'ERRORE SCAN';
+            det = 'Tutti i percorsi sensibili (.env, .git, dump SQL) risultano protetti (404/403/redirect)';
           }
-
-          let det = 'Scansione endpoint eseguita con successo';
-          if (k === 'files') {
-            const rawExposed = (v?.result?.exposedFiles || []) as Array<{ path?: string; risk?: string }>;
-            const realExposed = rawExposed.filter(f => {
-              const p = (f.path || '').toLowerCase();
-              return !p.includes('robots.txt') && !p.includes('security.txt');
-            });
-
-            if (realExposed.length > 0) {
-              s = 'RISCHIO';
-              const names = realExposed.map(f => f.path).slice(0, 3).join(', ');
-              det = `Rilevati ${realExposed.length} file sensibili esposti (${names})`;
-            } else {
-              s = 'NESSUNA ANOMALIA';
-              det = 'Tutti i percorsi sensibili (.env, .git, dump SQL) risultano protetti (404/403/redirect)';
-            }
-          } else if (k === 'directory-listing') {
-            const expDirs = (v?.result?.exposedDirectories || []) as Array<{ path?: string }>;
-            if (expDirs.length > 0) {
-              s = 'RISCHIO';
-              const names = expDirs.map(d => d.path).slice(0, 3).join(', ');
-              det = `Rilevate ${expDirs.length} directory con indicizzazione aperta (${names})`;
-            } else {
-              s = 'NESSUNA ANOMALIA';
-              det = 'Nessun directory listing attivo su cartelle standard';
-            }
-          } else if (k === 'secrets') {
-            const sec = v?.result?.detectedSecrets?.length || 0;
-            if (sec > 0) {
-              s = 'RISCHIO';
-              det = `Trovati ${sec} token o segreti hardcodati nei file JS`;
-            } else {
-              det = 'Nessuna API key o token rilevato nel bundle analizzato';
-            }
-          } else if (v?.result && typeof v.result === 'object') {
-            if ('message' in (v.result as Record<string, unknown>)) {
-              det = String((v.result as Record<string, unknown>).message);
-            } else if ('summary' in (v.result as Record<string, unknown>)) {
-              det = String((v.result as Record<string, unknown>).summary);
-            }
+        } else if (k === 'directory-listing') {
+          const expDirs = (v?.result?.exposedDirectories || []) as Array<{ path?: string }>;
+          if (expDirs.length > 0) {
+            s = 'RISCHIO';
+            const names = expDirs.map(d => d.path).slice(0, 3).join(', ');
+            det = `Rilevate ${expDirs.length} directory con indicizzazione aperta (${names})`;
+          } else {
+            s = 'NESSUNA ANOMALIA';
+            det = 'Nessun directory listing attivo su cartelle standard';
           }
+        } else if (k === 'secrets') {
+          const sec = v?.result?.detectedSecrets?.length || 0;
+          if (sec > 0) {
+            s = 'RISCHIO';
+            det = `Trovati ${sec} token o segreti hardcodati nei file JS`;
+          } else {
+            det = 'Nessuna API key o token rilevato nel bundle analizzato';
+          }
+        } else if (v?.result && typeof v.result === 'object') {
+          if ('message' in (v.result as Record<string, unknown>)) {
+            det = String((v.result as Record<string, unknown>).message);
+          } else if ('summary' in (v.result as Record<string, unknown>)) {
+            det = String((v.result as Record<string, unknown>).summary);
+          }
+        }
 
-          const label = vulnLabelMap[k.toLowerCase()] || k.toUpperCase();
-          return [label, s, det];
-        })
+        const label = vulnLabelMap[k.toLowerCase()] || k.toUpperCase();
+        return [label, s, det];
+      })
       : [
-          ['Scansione Vulnerabilità Web', 'NON ESEGUITO', 'Nessuna scansione di misconfigurazione o file sensibili eseguita in questa sessione.']
-        ];
+        ['Scansione Vulnerabilità Web', 'NON ESEGUITO', 'Nessuna scansione di misconfigurazione o file sensibili eseguita in questa sessione.']
+      ];
 
     autoTable(doc, {
       startY: 34,
@@ -613,7 +613,7 @@ export function ExportReportModal({
       }
     });
 
-    // 7. Pagina 4: Penetration Testing Attivo OWASP (13 Sonde & Exploit Probe)
+    // 7. Pagina 4: Penetration Testing Attivo OWASP (14 Sonde & Exploit Probe)
     doc.addPage();
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 28, 'F');
@@ -624,31 +624,31 @@ export function ExportReportModal({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    const pentestSummaryTxt = pentestResults 
-      ? `Probe Totali: ${pentestResults.totalProbes || pentestResults.probes?.length || 13} | Superate: ${pentestResults.passedCount ?? '-'} | Vulnerabili: ${pentestResults.vulnerableCount ?? 0} | Target: ${target}`
+    const pentestSummaryTxt = pentestResults
+      ? `Probe Totali: ${pentestResults.totalProbes || pentestResults.probes?.length || 14} | Superate: ${pentestResults.passedCount ?? '-'} | Vulnerabili: ${pentestResults.vulnerableCount ?? 0} | Target: ${target}`
       : `Verifica Empirica Attiva OWASP Top 10, Bot Protection & AI Scraper Governance | Target: ${target}`;
     doc.text(pentestSummaryTxt, 14, 23);
 
     const pentestRows: string[][] = (pentestResults?.probes && pentestResults.probes.length > 0)
       ? pentestResults.probes.map((p: any) => {
-          let s = 'NON VALUTATO';
-          if (p.status === 'passed') {
-            s = p.category === 'governance' ? 'CONFORME' : 'NESSUNA ANOMALIA';
-          } else if (p.status === 'vulnerable') {
-            s = `VULN (${String(p.severity).toUpperCase()})`;
-          } else if (p.status === 'inconclusive') {
-            s = 'INCONCLUSIVO';
-          } else if (p.status === 'skipped') {
-            s = 'NON APPLICABILE';
-          } else if (p.status === 'error') {
-            s = 'ERRORE PROBE';
-          }
-          const ev = (p.evidence ? `${p.evidence} - ` : '') + (p.technicalDetails || p.remediationAdvice || '-');
-          return [p.name || p.id, s, (p.cwe || p.owaspCategory || '-').toUpperCase(), ev];
-        })
+        let s = 'NON VALUTATO';
+        if (p.status === 'passed') {
+          s = p.category === 'governance' ? 'CONFORME' : 'NESSUNA ANOMALIA';
+        } else if (p.status === 'vulnerable') {
+          s = `VULN (${String(p.severity).toUpperCase()})`;
+        } else if (p.status === 'inconclusive') {
+          s = 'INCONCLUSIVO';
+        } else if (p.status === 'skipped') {
+          s = 'NON APPLICABILE';
+        } else if (p.status === 'error') {
+          s = 'ERRORE PROBE';
+        }
+        const ev = (p.evidence ? `${p.evidence} - ` : '') + (p.technicalDetails || p.remediationAdvice || '-');
+        return [p.name || p.id, s, (p.cwe || p.owaspCategory || '-').toUpperCase(), ev];
+      })
       : [
-          ['Suite Pentest', 'NON ESEGUITO', 'N/A', 'Nessuna sonda di penetration testing empirico eseguita in questa sessione.']
-        ];
+        ['Suite Pentest', 'NON ESEGUITO', 'N/A', 'Nessuna sonda di penetration testing empirico eseguita in questa sessione.']
+      ];
 
     autoTable(doc, {
       startY: 34,
