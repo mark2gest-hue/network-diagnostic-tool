@@ -1,9 +1,17 @@
 # SESSION_STATE.md
 
 ## ⚠️ SESSIONE IN CORSO (riprendere da qui)
-**Data ultimo aggiornamento**: 2026-10-14
+**Data ultimo aggiornamento**: 2026-10-17
 
-**OBIETTIVO ATTUALE**: Hardening sicurezza SSRF/TOCTOU + fix IPv6 — **COMPLETATO** (tsc = 0 errori).
+**OBIETTIVO ATTUALE**: Modulo "Login Exposure & Credential Defense" (Audit Form Reale, Anti-Bot & Rate-Limit Check) — **COMPLETATO** (tsc = 0 errori).
+
+### Nuova Funzionalità Integrata (100% Empirica e Non Fittizia)
+- [x] Engine deterministico: `src/lib/login-exposure-engine.ts` (ispezione markup form, input password, assenza 2FA/MFA, rilevamento Turnstile/reCAPTCHA, misurazione latenza e risposte consecutive a 3 tentativi controllati per rate-limiting/tarpit, catalog firme vendor apparati con credenziali di default note).
+- [x] API Routes dedicate: `src/app/api/security/login-exposure/route.ts` e `src/app/api/vulnerabilities/login-exposure/route.ts` con pinning IP e protezione anti-SSRF/TOCTOU.
+- [x] Hook di suite: `src/hooks/useVulnerabilityScan.ts` aggiornato con il nuovo test 'login-exposure' (peso 35 nel Risk Score).
+- [x] Componenti UI: `VulnerabilityScan.tsx` (nuova riga espandibile dedicata) e `ResultRenderer.tsx` (card dedicata con evidenza form, 2FA, anti-bot, evidenze rate-limiting e vendor signature).
+- [x] Esportazione Report PDF: `src/components/dashboard/ExportReportModal.tsx` con tabella aggiornata e dettagli tecnici reali per l'imprenditore.
+- [x] Verifica statica: `npx tsc --noEmit` completato con 0 errori.
 
 ### Punti 1 e 2 — COMPLETATI
 

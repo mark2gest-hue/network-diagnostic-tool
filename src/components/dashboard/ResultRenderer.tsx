@@ -65,6 +65,137 @@ export function ResultRenderer({ result }: ResultRendererProps) {
   const data = result as Record<string, unknown>;
 
   try {
+    // 0. Login Exposure & Credential Defense
+    if ('formAnalysis' in data && 'rateLimitAudit' in data) {
+      const form = data.formAnalysis as {
+        hasForm?: boolean;
+        hasPasswordField?: boolean;
+        hasUsernameField?: boolean;
+        hasSubmitButton?: boolean;
+        hasMfaField?: boolean;
+        antiBotProtection?: string;
+        csrfProtected?: boolean;
+        detectedFields?: string[];
+      };
+      const rateLimit = data.rateLimitAudit as {
+        testedRequests?: number;
+        avgLatencyMs?: number;
+        statuses?: number[];
+        rateLimitEnforced?: boolean;
+        evidenceSummary?: string;
+      };
+      const vendor = data.vendorSignature as {
+        vendor?: string;
+        category?: string;
+        defaultCredentialsEvidence?: string;
+        detectedBy?: string;
+      } | undefined;
+      const risk = String(data.exposureRisk || 'LOW');
+      const findings = Array.isArray(data.findings) ? (data.findings as string[]) : [];
+      const recs = Array.isArray(data.recommendations) ? (data.recommendations as string[]) : [];
+
+      const riskTone = risk === 'CRITICAL' || risk === 'HIGH' ? 'crit' : risk === 'MEDIUM' ? 'warn' : 'ok';
+
+      return (
+        <div className="space-y-3 text-xs">
+          {/* Header Stato & Vendor */}
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+            riskTone === 'crit' 
+              ? 'bg-red-950/30 border-red-500/30 text-red-300' 
+              : riskTone === 'warn'
+              ? 'bg-amber-950/30 border-amber-500/30 text-amber-300'
+              : 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300'
+          }`}>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] text-zinc-400 uppercase font-semibold block truncate">Postura Autenticazione</span>
+              <span className="font-bold text-xs">
+                {vendor ? `${vendor.vendor} (${vendor.category})` : form.hasPasswordField ? 'Form di Accesso Esposto' : 'Nessun Form Login Rilevato'}
+              </span>
+            </div>
+            <Badge variant="outline" className={cn('shrink-0 whitespace-nowrap text-[10px] font-bold uppercase', 
+              riskTone === 'crit' ? 'bg-red-500/20 text-red-300 border-red-500/40' :
+              riskTone === 'warn' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+              'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+            )}>
+              Rischio {risk}
+            </Badge>
+          </div>
+
+          {/* Dettagli Form & Difese */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+              <span className="text-[9px] text-zinc-500 block uppercase">Input Password</span>
+              <span className={form.hasPasswordField ? 'text-amber-400 font-bold' : 'text-zinc-400'}>
+                {form.hasPasswordField ? 'Rilevato' : 'Assente'}
+              </span>
+            </div>
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+              <span className="text-[9px] text-zinc-500 block uppercase">Verifica 2FA/MFA</span>
+              <span className={form.hasMfaField ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                {form.hasMfaField ? 'Attiva' : 'Non Presente'}
+              </span>
+            </div>
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+              <span className="text-[9px] text-zinc-500 block uppercase">Anti-Automazione</span>
+              <span className={form.antiBotProtection !== 'none' ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                {form.antiBotProtection && form.antiBotProtection !== 'none' ? form.antiBotProtection.replace('_', ' ') : 'Nessun CAPTCHA'}
+              </span>
+            </div>
+            <div className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+              <span className="text-[9px] text-zinc-500 block uppercase">Rate-Limiting</span>
+              <span className={rateLimit.rateLimitEnforced ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                {rateLimit.rateLimitEnforced ? 'Attivo / Tarpit' : 'Non Rilevato'}
+              </span>
+            </div>
+          </div>
+
+          {/* Evidenza Vendor & Default Passwords */}
+          {vendor && (
+            <div className="p-2 rounded-lg bg-red-950/20 border border-red-500/30 text-red-200 space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider block text-red-400">
+                ⚠️ Impronta Vendor & Credenziali Note di Fabbrica:
+              </span>
+              <div className="font-mono text-xs text-zinc-200">
+                Default: <span className="text-amber-300 font-bold">{vendor.defaultCredentialsEvidence}</span>
+              </div>
+              <div className="text-[10px] text-zinc-400">Riconosciuto tramite: {vendor.detectedBy}</div>
+            </div>
+          )}
+
+          {/* Evidenza empirica Rate Limit */}
+          <div className="p-2 rounded-lg bg-zinc-950/70 border border-zinc-800 space-y-1 font-mono text-[11px]">
+            <div className="flex justify-between items-center text-zinc-400">
+              <span>Evidenza Rate-Limiting:</span>
+              <span className="text-zinc-200">{rateLimit.evidenceSummary}</span>
+            </div>
+          </div>
+
+          {/* Findings e Raccomandazioni */}
+          {findings.length > 0 && (
+            <div className="space-y-1">
+              <span className="text-[10px] font-semibold text-zinc-400 block uppercase">Evidenze Rilevate ({findings.length})</span>
+              <ul className="list-disc list-inside space-y-0.5 text-zinc-300 text-[11px]">
+                {findings.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {recs.length > 0 && (
+            <div className="p-2 rounded-lg bg-blue-950/20 border border-blue-500/30 text-blue-200 space-y-1 text-[11px]">
+              <span className="text-[10px] font-bold uppercase text-blue-400 block">Raccomandazione di Remediation:</span>
+              <ul className="list-disc list-inside space-y-0.5 text-zinc-300">
+                {recs.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     // 1. DNS Global Propagation
     if ('resolvers' in data && Array.isArray(data.resolvers)) {
       const resolvers = data.resolvers as ResolverCheck[];

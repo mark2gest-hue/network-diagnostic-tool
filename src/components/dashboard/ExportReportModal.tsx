@@ -365,6 +365,7 @@ export function ExportReportModal({
       caa: 'AUTORIZZAZIONE DNS CAA',
       https: 'FORZATURA HTTPS (PORTA 80)',
       waf: 'WAF & CLOUD PERIMETER',
+      'login-exposure': 'LOGIN EXPOSURE & CREDENTIAL DEFENSE',
     };
 
     const safeVuln = vulnerabilityResults || {};
@@ -419,6 +420,20 @@ export function ExportReportModal({
           } else {
             det = 'Nessuna API key o token rilevato nel bundle analizzato';
           }
+        } else if (k === 'login-exposure' && v?.result) {
+          const res = v.result as Record<string, any>;
+          const risk = res.exposureRisk || 'LOW';
+          if (risk === 'CRITICAL' || risk === 'HIGH') {
+            s = 'RISCHIO';
+          } else if (risk === 'MEDIUM') {
+            s = 'ATTENZIONE';
+          } else {
+            s = 'NESSUNA ANOMALIA';
+          }
+          const vendorStr = res.vendorSignature ? `[${res.vendorSignature.vendor}] ` : '';
+          const rlStr = res.rateLimitAudit?.rateLimitEnforced ? 'Rate-limit attivo' : 'No rate-limit';
+          const mfaStr = res.formAnalysis?.hasMfaField ? 'MFA rilevata' : 'No MFA';
+          det = `${vendorStr}Form password esposto: ${res.formAnalysis?.hasPasswordField ? 'Sì' : 'No'} | ${mfaStr} | ${rlStr}`;
         } else if (v?.result && typeof v.result === 'object') {
           if ('message' in (v.result as Record<string, unknown>)) {
             det = String((v.result as Record<string, unknown>).message);
