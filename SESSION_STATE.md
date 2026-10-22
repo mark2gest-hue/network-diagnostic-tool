@@ -4,6 +4,7 @@
 **Data ultimo aggiornamento**: 2026-10-22
 
 **OBIETTIVO ATTUALE**: Integrazione Sonde "Claude-Red" Offensive Security & AI Red Teaming — **COMPLETATO** (commit `80dd221`, tsc = 0 errori, build = OK).
+- [x] Filtro Anti-Falsi-Positivi SPA: aggiunta discriminazione Content-Type, regex payload e `redirect: manual` per evitare che i redirect 307/308 a `/login` delle SPA vengano scambiati per vulnerabilità LLM/API. Test live su `aiutiamoci.cloud` 100% passed.
 
 ### Nuova Funzionalità Integrata (Sonde Claude-Red in Pentest Engine)
 - [x] Estensione Tipi: `src/types/pentest.ts` con la categoria `ai_redteam` e mapping in `src/lib/pentest-findings.ts`.
