@@ -1,17 +1,18 @@
 # SESSION_STATE.md
 
 ## ⚠️ SESSIONE IN CORSO (riprendere da qui)
-**Data ultimo aggiornamento**: 2026-10-17
+**Data ultimo aggiornamento**: 2026-10-22
 
-**OBIETTIVO ATTUALE**: Modulo "Login Exposure & Credential Defense" (Audit Form Reale, Anti-Bot & Rate-Limit Check) — **COMPLETATO** (tsc = 0 errori).
+**OBIETTIVO ATTUALE**: Integrazione Sonde "Claude-Red" Offensive Security & AI Red Teaming — **COMPLETATO** (commit `80dd221`, tsc = 0 errori, build = OK).
 
-### Nuova Funzionalità Integrata (100% Empirica e Non Fittizia)
-- [x] Engine deterministico: `src/lib/login-exposure-engine.ts` (ispezione markup form, input password, assenza 2FA/MFA, rilevamento Turnstile/reCAPTCHA, misurazione latenza e risposte consecutive a 3 tentativi controllati per rate-limiting/tarpit, catalog firme vendor apparati con credenziali di default note).
-- [x] API Routes dedicate: `src/app/api/security/login-exposure/route.ts` e `src/app/api/vulnerabilities/login-exposure/route.ts` con pinning IP e protezione anti-SSRF/TOCTOU.
-- [x] Hook di suite: `src/hooks/useVulnerabilityScan.ts` aggiornato con il nuovo test 'login-exposure' (peso 35 nel Risk Score).
-- [x] Componenti UI: `VulnerabilityScan.tsx` (nuova riga espandibile dedicata) e `ResultRenderer.tsx` (card dedicata con evidenza form, 2FA, anti-bot, evidenze rate-limiting e vendor signature).
-- [x] Esportazione Report PDF: `src/components/dashboard/ExportReportModal.tsx` con tabella aggiornata e dettagli tecnici reali per l'imprenditore.
-- [x] Verifica statica: `npx tsc --noEmit` completato con 0 errori.
+### Nuova Funzionalità Integrata (Sonde Claude-Red in Pentest Engine)
+- [x] Estensione Tipi: `src/types/pentest.ts` con la categoria `ai_redteam` e mapping in `src/lib/pentest-findings.ts`.
+- [x] Iniezione Sonde in `src/app/api/pentest/run/route.ts`:
+  1. `pentest-claude-red-ai-exposure` (OWASP LLM01 / LLM02): rilevamento endpoint agentici AI esposti senza autenticazione (`/api/chat`, `/api/mcp`, `/v1/chat/completions`).
+  2. `pentest-claude-red-api-surface` (OWASP API09 / CWE-200): discovery automatica schemi Swagger/OpenAPI e playground GraphQL in produzione.
+  3. `pentest-claude-red-jwt-hygiene` (CWE-345 / OWASP A02): audit flag crittografici `HttpOnly` e `Secure` sui token JWT.
+  4. `pentest-claude-red-cloud-metadata` (CWE-918 / OWASP A10 SSRF): verifica non-invasiva di esposizione metadati cloud e credenziali IAM.
+- [x] Verifica statica e build: `npx tsc --noEmit` completato con 0 errori, `npm run build` completato con successo (13 route statiche, 41 API route).
 
 ### Punti 1 e 2 — COMPLETATI
 
