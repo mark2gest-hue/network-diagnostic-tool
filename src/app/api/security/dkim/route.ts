@@ -4,7 +4,7 @@ import { domainSchema, formatZodError } from '@/lib/validators';
 
 export const dynamic = 'force-dynamic';
 
-const COMMON_SELECTORS = ['default', 'google', 'mail', 'smtp', 'dkim', 'sig1', 'k1'];
+const COMMON_SELECTORS = ['default', 'resend', 'google', 'mail', 'smtp', 'dkim', 'sig1', 'k1'];
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -23,7 +23,9 @@ export async function GET(req: Request) {
         try {
           const query = `${selector}._domainkey.${validatedDomain}`;
           const records = await dns.resolveTxt(query);
-          const dkimRecord = records.flat().find(r => r.startsWith('v=DKIM1'));
+          const flatRecords = records.flat();
+          // Supporta sia record con v=DKIM1 che record con solo chiave pubblica p=... (come Resend)
+          const dkimRecord = flatRecords.find(r => r.startsWith('v=DKIM1') || r.includes('p='));
           if (dkimRecord) {
             return { selector, found: true, record: dkimRecord };
           }
