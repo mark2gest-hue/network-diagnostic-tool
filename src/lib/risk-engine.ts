@@ -724,6 +724,41 @@ export function extractFindingsFromResults(rawResults: Record<string, unknown>):
     });
   }
 
+  // 8.1 Threat Intelligence: Esposizione DeepWeb e Leak Credenziali Aziendali
+  const leaksData = unwrap<{
+    combCount?: number;
+    breachesCount?: number;
+    breaches?: Array<{ title?: string; breachDate?: string; pwnCount?: number }>;
+    sampleLeaks?: Array<{ email: string; passwordMasked: string; source: string }>;
+    totalExposedCount?: number;
+    status?: string;
+  }>(rawResults['leaks'] || secObj?.['leaks']);
+
+  if (leaksData && (Number(leaksData.combCount || 0) > 0 || Number(leaksData.breachesCount || 0) > 0 || leaksData.status === 'fail' || leaksData.status === 'warning')) {
+    const cCount = Number(leaksData.combCount || 0);
+    const bCount = Number(leaksData.breachesCount || (leaksData.breaches?.length || 0));
+    const isCritical = cCount > 50 || bCount >= 3;
+
+    findings.push({
+      id: 'sec-credential-leak',
+      category: 'security',
+      severity: isCritical ? 'critical' : 'high',
+      title: isCritical
+        ? 'Compromissione Massiva Credenziali nel DeepWeb / COMB Dump'
+        : 'Credenziali Aziendali o Data Breach Rilevati negli Archivi DeepWeb',
+      description: `Rilevate ${cCount} credenziali aziendali o ${bCount} archivi di breach storici contenenti account con dominio aziendale esposti in archivi pubblici e dump del cybercrime (COMB 3.2B records / infostealer logs).`,
+      evidence: `COMB Leaks: ${cCount} record. Breach associati: ${bCount}. Campione compromesso presente: ${Boolean(leaksData.sampleLeaks && leaksData.sampleLeaks.length > 0)}.`,
+      impact: 'Rischio imminente di credential stuffing, takeover di account email aziendali, accessi non autorizzati a VPN/gestionali e attacchi BEC (Business Email Compromise).',
+      confidence: 0.98,
+      remediation: {
+        action: 'Attivare obbligo perentorio di autenticazione a due fattori (MFA con FIDO2 o Authenticator app, vietando SMS), forzare il cambio password immediato su tutti gli account compromessi e revocare le sessioni attive su Microsoft 365 / Google Workspace.',
+        codeSnippet: '# PowerShell Microsoft 365: Revoca immediata di tutti i token di refresh per gli utenti esposti\nRevoke-AzureADUserAllRefreshToken -ObjectId "<User-Principal-Name>"',
+        technicalReference: 'CWE-522: Insufficiently Protected Credentials & MITRE D3-CRED',
+      },
+      timestamp: now,
+    });
+  }
+
   // 9. Sonde di Penetration Test Attivo
   const pentestRaw = (rawResults['pentest'] || rawResults['pentestResults']) as { tests?: Array<Record<string, unknown>> } | Array<Record<string, unknown>> | undefined;
   const pentestTests = Array.isArray(pentestRaw) ? pentestRaw : (pentestRaw?.tests || []);

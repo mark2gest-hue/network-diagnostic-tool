@@ -414,6 +414,7 @@ export default function Dashboard() {
           <ExecutiveRemediationSummary 
             target={demoScenario ? demoScenario.asset.target : target} 
             perspectiveMode={perspectiveMode} 
+            onPerspectiveChange={setPerspectiveMode}
             onOpenExportModal={isDemoMode ? undefined : () => setReportModalOpen(true)}
             demoAssessment={demoScenario?.assessment}
             results={results}

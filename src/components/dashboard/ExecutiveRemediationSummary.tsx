@@ -10,13 +10,14 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Button } from '@/components/ui/button';
-import { BigScore, ActionCard, StatusPill, RowList, ExpandableRow, CommandBlock } from '@/components/ui/nd';
+import { BigScore, ActionCard, StatusPill, RowList, ExpandableRow, CommandBlock, Segmented } from '@/components/ui/nd';
 import { extractFindingsFromResults, calculateRiskAssessment } from '@/lib/risk-engine';
 import type { RiskAssessment } from '@/types/findings';
 
 export interface ExecutiveRemediationSummaryProps {
   target: string;
   perspectiveMode?: 'executive' | 'it-pro';
+  onPerspectiveChange?: (mode: 'executive' | 'it-pro') => void;
   onOpenExportModal?: () => void;
   demoAssessment?: RiskAssessment;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,6 +49,7 @@ export interface RemediationItem {
 export function ExecutiveRemediationSummary({
   target,
   perspectiveMode = 'executive',
+  onPerspectiveChange,
   onOpenExportModal,
   demoAssessment,
   results,
@@ -187,6 +189,12 @@ export function ExecutiveRemediationSummary({
         mitre = 'D3-RA';
         cwe = 'CWE-358';
         nist = 'DE.CM-1';
+      } else if (fid.includes('leak') || fid.includes('credential')) {
+        category = 'network';
+        solType = 'Policy / Config';
+        mitre = 'D3-CRED';
+        cwe = 'CWE-522';
+        nist = 'PR.AC-1';
       }
 
       return {
@@ -502,6 +510,19 @@ export function ExecutiveRemediationSummary({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {onPerspectiveChange && (
+            <Segmented
+              label="Selettore modalità visualizzazione"
+              value={perspectiveMode}
+              onChange={onPerspectiveChange}
+              options={[
+                { value: 'executive', label: 'Vista Direzione' },
+                { value: 'it-pro', label: 'Vista Tecnica IT' },
+              ]}
+              className="bg-field border border-border"
+            />
+          )}
+
           <Button
             variant="outline"
             onClick={downloadJsonReport}
