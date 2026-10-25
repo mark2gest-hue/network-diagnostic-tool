@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { BigScore, ActionCard, StatusPill, RowList, ExpandableRow, CommandBlock, Segmented } from '@/components/ui/nd';
 import { extractFindingsFromResults, calculateRiskAssessment } from '@/lib/risk-engine';
 import type { RiskAssessment } from '@/types/findings';
+import { SecurityTribunalCard } from './SecurityTribunalCard';
 
 export interface ExecutiveRemediationSummaryProps {
   target: string;
@@ -587,6 +588,15 @@ export function ExecutiveRemediationSummary({
           )}
         </BigScore>
       </div>
+
+      {/* Tribunale di Sicurezza Multi-Modello (3 Giudici su Fatti Empirici) */}
+      {hasExecutedTests && (
+        <SecurityTribunalCard
+          target={target}
+          assessment={assessment}
+          rawResults={consolidatedRaw}
+        />
+      )}
 
       {/* Cosa chiedere al team IT (3 azioni principali) */}
       <div className="space-y-4">
