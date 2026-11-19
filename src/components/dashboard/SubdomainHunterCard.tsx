@@ -19,6 +19,9 @@ export interface SubdomainItem {
   cname?: string;
   isTakeoverVulnerable: boolean;
   takeoverFingerprint?: string;
+  isExposedOrchestrator?: boolean;
+  exposedPanelLabel?: string;
+  exposedPanelStatus?: number;
   evidenceSnippet?: string;
   curlCommand?: string;
   status: 'active' | 'unresolved' | 'vulnerable';
@@ -29,6 +32,7 @@ export interface SubdomainHunterData {
   totalDiscovered: number;
   activeCount: number;
   vulnerableCount: number;
+  exposedOrchestratorCount?: number;
   subdomains: SubdomainItem[];
   mitreDefense?: {
     id: string;
@@ -80,7 +84,7 @@ export function SubdomainHunterCard({ target, perspectiveMode = 'executive' }: S
 
   const displayedList = data?.subdomains.filter((item) => {
     if (filterVulnerableOnly) {
-      return item.isTakeoverVulnerable || item.status === 'vulnerable';
+      return Boolean(item.isTakeoverVulnerable || item.isExposedOrchestrator || item.status === 'vulnerable');
     }
     return true;
   }) || [];
@@ -141,13 +145,21 @@ export function SubdomainHunterCard({ target, perspectiveMode = 'executive' }: S
           </div>
 
           <div className="bg-[#070a12] border border-[#182338] p-2.5 rounded">
-            <span className="text-[10px] text-[#64748b] block font-bold uppercase">Rischio Takeover CNAME</span>
+            <span className="text-[10px] text-[#64748b] block font-bold uppercase">Rischio Takeover / Pannelli</span>
             <span
               className={`text-base font-bold font-mono ${
-                data.vulnerableCount > 0 ? 'text-[#ef4444]' : 'text-[#38bdf8]'
+                data.vulnerableCount > 0
+                  ? 'text-[#ef4444]'
+                  : (data.exposedOrchestratorCount ?? 0) > 0
+                  ? 'text-[#f97316]'
+                  : 'text-[#38bdf8]'
               }`}
             >
-              {data.vulnerableCount > 0 ? `${data.vulnerableCount} CRITICO` : '0 (Sicuro)'}
+              {data.vulnerableCount > 0
+                ? `${data.vulnerableCount} CRITICO`
+                : (data.exposedOrchestratorCount ?? 0) > 0
+                ? `${data.exposedOrchestratorCount} PANNELLI ESPOSTI`
+                : '0 (Sicuro)'}
             </span>
           </div>
 
@@ -218,6 +230,8 @@ export function SubdomainHunterCard({ target, perspectiveMode = 'executive' }: S
                   className={`p-2.5 rounded border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                     item.isTakeoverVulnerable
                       ? 'bg-[#450a0a]/40 border-[#b91c1c] text-white'
+                      : item.isExposedOrchestrator
+                      ? 'bg-[#431407]/40 border-[#ea580c] text-white'
                       : item.status === 'active'
                       ? 'bg-[#070a12] border-[#182338] hover:border-[#2b3c5a]'
                       : 'bg-[#080d17]/50 border-[#141d2e] opacity-70'
@@ -228,6 +242,8 @@ export function SubdomainHunterCard({ target, perspectiveMode = 'executive' }: S
                       className={`w-2 h-2 rounded-full shrink-0 ${
                         item.isTakeoverVulnerable
                           ? 'bg-[#ef4444] animate-ping'
+                          : item.isExposedOrchestrator
+                          ? 'bg-[#f97316]'
                           : item.status === 'active'
                           ? 'bg-[#10b981]'
                           : 'bg-[#64748b]'
@@ -276,6 +292,17 @@ export function SubdomainHunterCard({ target, perspectiveMode = 'executive' }: S
                             {item.curlCommand}
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {item.isExposedOrchestrator && (
+                      <div className="w-full flex flex-col gap-1 mt-1">
+                        <span className="bg-[#ea580c] text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block w-fit">
+                          PANNELLO ESPOSTO (ANTI-ARTEX): {item.exposedPanelLabel} • HTTP {item.exposedPanelStatus}
+                        </span>
+                        <span className="text-[10px] text-[#fdba74]">
+                          Isolare dietro VPN/Tailscale o Cloudflare Access OTP — lasciare pubblici solo eventuali webhook HMAC.
+                        </span>
                       </div>
                     )}
                   </div>

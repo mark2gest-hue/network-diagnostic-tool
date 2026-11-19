@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import dns from 'dns/promises';
 import { validateSafeTarget } from '@/lib/validators';
+import { isPrivateOrReservedIP, createPinnedLookup } from '@/lib/security-guard';
+import { safeFetch as pinnedSafeFetch } from '@/lib/safe-http-probe';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +17,15 @@ interface DiscoveredSubdomain {
   cname?: string;
   isTakeoverVulnerable: boolean;
   takeoverFingerprint?: string;
+  isExposedOrchestrator?: boolean;
+  exposedPanelLabel?: string;
+  exposedPanelStatus?: number;
   evidenceSnippet?: string;
   curlCommand?: string;
   status: 'active' | 'unresolved' | 'vulnerable';
 }
+
+const ORCHESTRATOR_PANEL_RE = /^(n8n|portainer|grafana|jenkins|kibana|airflow|argocd|rancher|admin|panel|staging|dev|vpn|cpanel|phpmyadmin)\./i;
 
 const TAKEOVER_SERVICES: Array<{ domainPattern: RegExp; serviceName: string; signature: string }> = [
   { domainPattern: /\.s3[.-].*\.amazonaws\.com$/i, serviceName: 'AWS S3 Bucket', signature: 'NoSuchBucket' },
@@ -115,6 +122,34 @@ async function checkTakeoverSignature(host: string, expectedSignature: string): 
   return false;
 }
 
+async function checkExposedPanelHttp(
+  host: string,
+  resolvedIps: string[]
+): Promise<{ exposed: boolean; status?: number }> {
+  const publicIps = resolvedIps.filter((ip) => !isPrivateOrReservedIP(ip));
+  if (publicIps.length === 0) {
+    return { exposed: false };
+  }
+
+  try {
+    const res = await pinnedSafeFetch(`https://${host}/`, {
+      method: 'GET',
+      lookup: createPinnedLookup(publicIps),
+      redirect: 'manual',
+      timeout: 3000,
+      headers: {
+        'User-Agent': 'NetworkDiag-SubdomainHunter/1.0',
+      },
+    });
+    if ([200, 301, 302, 401].includes(res.status)) {
+      return { exposed: true, status: res.status };
+    }
+  } catch {
+    // Host HTTPS non raggiungibile o timeout
+  }
+  return { exposed: false };
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const rawTarget = searchParams.get('target') || searchParams.get('domain');
@@ -132,7 +167,10 @@ export async function GET(req: Request) {
     let discoveredNames = await fetchCrtShSubdomains(domain);
 
     // Fallback passivo di base se crt.sh non restituisce risultati o va in timeout
-    const commonPrefixes = ['www', 'mail', 'webmail', 'api', 'dev', 'staging', 'portal', 'admin', 'vpn', 'remote', 'app', 'cdn'];
+    const commonPrefixes = [
+      'www', 'mail', 'webmail', 'api', 'dev', 'staging', 'portal', 'admin', 'vpn', 'remote', 'app', 'cdn',
+      'n8n', 'grafana', 'portainer', 'jenkins', 'kibana',
+    ];
     if (discoveredNames.length === 0) {
       discoveredNames = [domain, ...commonPrefixes.map((p) => `${p}.${domain}`)];
     } else {
@@ -146,13 +184,16 @@ export async function GET(req: Request) {
     // Limite prudenziale di analisi passiva a max 25 host per non saturare la richiesta
     const candidateList = Array.from(new Set(discoveredNames)).slice(0, 25);
 
-    // 2. Risoluzione DNS e analisi CNAME Takeover
+    // 2. Risoluzione DNS e analisi CNAME Takeover + Pannelli Orchestratori Esposti (Anti-ARTEX)
     const results: DiscoveredSubdomain[] = await Promise.all(
       candidateList.map(async (host): Promise<DiscoveredSubdomain> => {
         let resolvedIps: string[] = [];
         let cname: string | undefined;
         let isTakeoverVulnerable = false;
         let takeoverFingerprint: string | undefined;
+        let isExposedOrchestrator = false;
+        let exposedPanelLabel: string | undefined;
+        let exposedPanelStatus: number | undefined;
 
         try {
           const ips = await dns.resolve4(host);
@@ -188,8 +229,18 @@ export async function GET(req: Request) {
           }
         }
 
+        // Verifica esposizione pubblica di pannelli orchestratori / CI-CD / admin
+        if (resolvedIps.length > 0 && ORCHESTRATOR_PANEL_RE.test(host)) {
+          const panelCheck = await checkExposedPanelHttp(host, resolvedIps);
+          if (panelCheck.exposed) {
+            isExposedOrchestrator = true;
+            exposedPanelLabel = host.split('.')[0].toLowerCase();
+            exposedPanelStatus = panelCheck.status;
+          }
+        }
+
         let status: 'active' | 'unresolved' | 'vulnerable' = 'unresolved';
-        if (isTakeoverVulnerable) {
+        if (isTakeoverVulnerable || isExposedOrchestrator) {
           status = 'vulnerable';
         } else if (resolvedIps.length > 0 || cname) {
           status = 'active';
@@ -201,6 +252,9 @@ export async function GET(req: Request) {
           cname,
           isTakeoverVulnerable,
           takeoverFingerprint,
+          isExposedOrchestrator,
+          exposedPanelLabel,
+          exposedPanelStatus,
           evidenceSnippet,
           curlCommand,
           status,
@@ -210,12 +264,14 @@ export async function GET(req: Request) {
 
     const activeList = results.filter((r) => r.status === 'active' || r.status === 'vulnerable');
     const vulnerableCount = results.filter((r) => r.isTakeoverVulnerable).length;
+    const exposedOrchestratorCount = results.filter((r) => r.isExposedOrchestrator).length;
 
     return NextResponse.json({
       target: domain,
       totalDiscovered: results.length,
       activeCount: activeList.length,
       vulnerableCount,
+      exposedOrchestratorCount,
       subdomains: results,
       mitreDefense: {
         id: 'D3-DNSA',
