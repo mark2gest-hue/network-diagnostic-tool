@@ -1634,6 +1634,28 @@ export function ResultRenderer({ result }: ResultRendererProps) {
                 eolDetail?: string;
               }>;
               eolDetected: Array<{ technology?: string; eolDetail?: string }>;
+              threatIntel?: {
+                checked?: boolean;
+                exposedVersionCount?: number;
+                note?: string;
+                catalogStatus?: {
+                  synced?: boolean;
+                  catalogVersion?: string | null;
+                  totalKev?: number;
+                };
+                matches?: Array<{
+                  product?: string;
+                  version?: string;
+                  matchType?: 'exact_cve' | 'kev_product_advisory';
+                  cveId?: string | null;
+                  osvId?: string;
+                  severity?: string;
+                  inCisaKev?: boolean;
+                  knownRansomware?: boolean;
+                  summary?: string;
+                  url?: string;
+                }>;
+              } | null;
               curlCommand?: string;
             };
 
@@ -1668,6 +1690,54 @@ export function ResultRenderer({ result }: ResultRendererProps) {
                     </div>
                   ))}
                 </div>
+
+                {info.threatIntel && (
+                  <div className="p-2 rounded bg-zinc-900/70 border border-zinc-800 space-y-1.5 text-[10px]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-zinc-300 uppercase">
+                        Cross-Check Threat Intel (CISA KEV / OSV)
+                      </span>
+                      <Badge variant="outline" className="text-[9px] font-mono bg-zinc-950 text-zinc-300 border-zinc-700">
+                        {info.threatIntel.catalogStatus?.synced
+                          ? `CISA KEV v${info.threatIntel.catalogStatus.catalogVersion || '?'} (${info.threatIntel.catalogStatus.totalKev ?? 0})`
+                          : 'DB KEV non sincronizzato'}
+                      </Badge>
+                    </div>
+                    {info.threatIntel.matches && info.threatIntel.matches.length > 0 ? (
+                      <div className="space-y-1">
+                        {info.threatIntel.matches.map((m, mIdx) => (
+                          <div key={mIdx} className="p-1.5 rounded bg-black/50 border border-zinc-800 space-y-0.5">
+                            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                              <span className="font-mono font-bold text-zinc-100">
+                                {m.cveId || m.osvId || 'Advisory'} · {m.product} {m.version}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-[8px] uppercase font-bold',
+                                  m.matchType === 'exact_cve' && m.inCisaKev
+                                    ? 'bg-red-950/60 text-red-300 border-red-500/50'
+                                    : m.matchType === 'exact_cve'
+                                    ? 'bg-amber-950/50 text-amber-300 border-amber-500/40'
+                                    : 'bg-zinc-900 text-zinc-300 border-zinc-700'
+                                )}
+                              >
+                                {m.matchType === 'exact_cve'
+                                  ? m.inCisaKev
+                                    ? 'CISA KEV · EXPLOIT ATTIVO'
+                                    : `OSV ${String(m.severity || 'HIGH').toUpperCase()}`
+                                  : 'KEV Product Advisory'}
+                              </Badge>
+                            </div>
+                            {m.summary && <p className="text-zinc-400 leading-snug">{m.summary}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-zinc-400">{info.threatIntel.note}</p>
+                    )}
+                  </div>
+                )}
 
                 {info.curlCommand && (
                   <div className="p-1.5 rounded bg-black/80 border border-zinc-800 text-[10px] text-zinc-400 font-mono select-all break-all">

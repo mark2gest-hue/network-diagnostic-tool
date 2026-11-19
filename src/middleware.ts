@@ -68,6 +68,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: 'Disabilitato in modalità demo: scansioni attive solo in locale' }, { status: 403 });
   }
 
+  if (isDemoMode && path.startsWith('/api/threat-intel/check')) {
+    return NextResponse.json({ error: 'Disabilitato in modalità demo: verifica stack attiva solo in locale' }, { status: 403 });
+  }
+
+  if (
+    isDemoMode &&
+    path.startsWith('/api/threat-intel/sync') &&
+    request.method !== 'GET' &&
+    !request.headers.get('x-threat-intel-secret')
+  ) {
+    return NextResponse.json({ error: 'Disabilitato in modalità demo: sync consentito solo in locale o con secret autorizzato' }, { status: 403 });
+  }
+
   if (isDemoMode && !path.startsWith('/api')) {
     if (!token || !(await verifyTokenHmac(token))) {
       return NextResponse.redirect(new URL('/login', request.url));
@@ -108,5 +121,6 @@ export const config = {
     '/api/ai/:path*',
     '/api/active-defense',
     '/api/defense/:path*',
+    '/api/threat-intel/:path*',
   ],
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -51,6 +51,28 @@ export function ExportReportModal({
   const [clientEmail, setClientEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [generatedPdfName, setGeneratedPdfName] = useState<string | null>(null);
+  const [threatIntelMeta, setThreatIntelMeta] = useState<{
+    synced?: boolean;
+    catalogVersion?: string | null;
+    totalKev?: number;
+    lastSyncedAt?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetch('/api/threat-intel/sync', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && data) setThreatIntelMeta(data);
+      })
+      .catch(() => {
+        // Non bloccante
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -100,7 +122,7 @@ export function ExportReportModal({
     // 2. Box Anagrafica Cliente
     doc.setFillColor(248, 250, 252); // slate-50
     doc.setDrawColor(226, 232, 240); // slate-200
-    doc.roundedRect(14, 48, pageWidth - 28, 26, 3, 3, 'FD');
+    doc.roundedRect(14, 48, pageWidth - 28, 32, 3, 3, 'FD');
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -130,7 +152,11 @@ export function ExportReportModal({
 
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Copertura Esecutiva Moduli: ${coveragePct}% (${completedCount}/${totalCount} moduli completati con successo)`, 18, 72);
+    doc.text(`Copertura Esecutiva Moduli: ${coveragePct}% (${completedCount}/${totalCount} moduli completati con successo)`, 18, 73);
+    const tiLine = threatIntelMeta?.synced
+      ? `Database Firme Minacce: CISA KEV v${threatIntelMeta.catalogVersion || '?'} (${threatIntelMeta.totalKev ?? 0} CVE attive · Sync ${threatIntelMeta.lastSyncedAt ? new Date(threatIntelMeta.lastSyncedAt).toLocaleDateString('it-IT') : 'N/A'}) + OSV.dev`
+      : 'Database Firme Minacce: Non sincronizzato localmente (+ OSV.dev live)';
+    doc.text(tiLine, 18, 78);
 
     // 4. Costruzione righe tabella diagnostica senza mockup
     const tableRows = allModulesList.map(([key, rawItem]) => {
@@ -208,7 +234,7 @@ export function ExportReportModal({
 
     // 5. Inserimento tabella tramite autotable con righe espandibili (no testo troncato)
     autoTable(doc, {
-      startY: 78,
+      startY: 84,
       head: [['Modulo Diagnostico', 'Esito', 'Dettagli / Evidenze Tecniche']],
       body: tableRows,
       theme: 'grid',

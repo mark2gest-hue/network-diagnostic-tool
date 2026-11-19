@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { validateSafeTarget } from '@/lib/validators';
 import { createPinnedLookup } from '@/lib/security-guard';
 import { safeHttpProbe, safeFetch } from '@/lib/safe-http-probe';
+import { checkBannerDisclosures } from '@/lib/threat-intel-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,7 +122,20 @@ export async function GET(req: Request) {
 
     const hasEolCritical = disclosures.some(d => d.risk === 'critical' || (d.isEol && d.risk === 'high'));
 
-    const finalStatus = hasEolCritical
+    let threatIntel = null;
+    try {
+      threatIntel = await checkBannerDisclosures(disclosures);
+    } catch {
+      threatIntel = null;
+    }
+
+    const hasExactCriticalCve = Boolean(
+      threatIntel?.matches?.some(
+        m => m.matchType === 'exact_cve' && (m.inCisaKev || m.severity === 'critical' || m.severity === 'high')
+      )
+    );
+
+    const finalStatus = hasEolCritical || hasExactCriticalCve
       ? 'fail'
       : (missingCount > 2 ? 'fail' : (missingCount > 0 || disclosures.some(d => d.hasVersion) ? 'warning' : 'pass'));
 
@@ -135,6 +149,7 @@ export async function GET(req: Request) {
         totalDisclosed: disclosures.length,
         disclosures,
         eolDetected: disclosures.filter(d => d.isEol),
+        threatIntel,
         curlCommand: `curl -I -sS "${url}" | grep -Ei "^(Server|X-Powered-By|X-AspNet|Via):"`
       },
       recommendation: missingCount > 0

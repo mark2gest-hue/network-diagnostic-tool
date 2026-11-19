@@ -1,9 +1,17 @@
 # SESSION_STATE.md
 
 ## ⚠️ SESSIONE IN CORSO (riprendere da qui)
-**Data ultimo aggiornamento**: 2026-10-22
+**Data ultimo aggiornamento**: 2026-11-19
 
-**OBIETTIVO ATTUALE**: Integrazione Sonde "Claude-Red" Offensive Security & AI Red Teaming — **COMPLETATO** (commit `80dd221`, tsc = 0 errori, build = OK).
+**OBIETTIVO ATTUALE**: Integrazione Database Firme Threat Intelligence (CISA KEV + OSV.dev) — **IMPLEMENTATO su branch `feat/threat-intel-signatures`**.
+- [x] Migrazione SQL `turso/migrations/002_threat_intel_signatures.sql` + tabelle in `src/lib/db.ts` (`threat_intel_meta`, `threat_intel_kev`, `threat_intel_osv_cache`).
+- [x] Engine `src/lib/threat-intel-engine.ts`: sync CISA KEV a batch, check OSV.dev con cache 24h e cross-check locale KEV, analisi banner HTTP senza falsi positivi.
+- [x] API `/api/threat-intel/sync` (GET stato, POST locale o con `x-threat-intel-secret`) e `/api/threat-intel/check` (stack o `packageJson`) + protezione `middleware.ts`.
+- [x] Innestazione su `/api/security/headers`, `src/lib/risk-engine.ts`, `ResultRenderer.tsx`, `ThreatIntelPanel.tsx` in `VulnerabilityScan.tsx` e intestazione firme in `ExportReportModal.tsx`.
+
+---
+### Sessione precedente (2026-10-22)
+**OBIETTIVO COMPLETATO**: Integrazione Sonde "Claude-Red" Offensive Security & AI Red Teaming — **COMPLETATO** (commit `80dd221`, tsc = 0 errori, build = OK).
 - [x] Filtro Anti-Falsi-Positivi SPA: aggiunta discriminazione Content-Type, regex payload e `redirect: manual` per evitare che i redirect 307/308 a `/login` delle SPA vengano scambiati per vulnerabilità LLM/API. Test live su `aiutiamoci.cloud` 100% passed.
 
 ### Nuova Funzionalità Integrata (Sonde Claude-Red in Pentest Engine)

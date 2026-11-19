@@ -317,8 +317,27 @@ export function extractFindingsFromResults(rawResults: Record<string, unknown>):
     }
   }
 
-  // Analisi Software EOL (da /api/security/headers)
-  const rawHeadersObj = unwrap<{ informationDisclosure?: { eolDetected?: Array<{ technology?: string; eolDetail?: string; value?: string; risk?: string }> } }>(rawResults['headers'] || secObj?.['headers']);
+  // Analisi Software EOL & Threat Intel CVE/KEV (da /api/security/headers)
+  const rawHeadersObj = unwrap<{
+    informationDisclosure?: {
+      eolDetected?: Array<{ technology?: string; eolDetail?: string; value?: string; risk?: string }>;
+      threatIntel?: {
+        matches?: Array<{
+          product?: string;
+          version?: string;
+          matchType?: 'exact_cve' | 'kev_product_advisory';
+          cveId?: string | null;
+          osvId?: string;
+          severity?: string;
+          inCisaKev?: boolean;
+          knownRansomware?: boolean;
+          summary?: string;
+          requiredAction?: string;
+          url?: string;
+        }>;
+      };
+    };
+  }>(rawResults['headers'] || secObj?.['headers']);
   if (rawHeadersObj?.informationDisclosure?.eolDetected && rawHeadersObj.informationDisclosure.eolDetected.length > 0) {
     for (const eol of rawHeadersObj.informationDisclosure.eolDetected) {
       findings.push({
@@ -334,6 +353,53 @@ export function extractFindingsFromResults(rawResults: Record<string, unknown>):
           action: `Aggiornare ${eol.technology || 'il componente'} all'ultimo ramo stabile supportato a lungo termine (LTS).`,
           codeSnippet: '# Esempio Debian/Ubuntu:\napt update && apt --only-upgrade install nginx',
           technicalReference: 'CWE-1104: Use of Unmaintained Third Party Components',
+        },
+        timestamp: now,
+      });
+    }
+  }
+
+  const tiMatches = rawHeadersObj?.informationDisclosure?.threatIntel?.matches;
+  if (Array.isArray(tiMatches) && tiMatches.length > 0) {
+    const exactMatches = tiMatches.filter((m) => m.matchType === 'exact_cve');
+    const advisoryMatches = tiMatches.filter((m) => m.matchType === 'kev_product_advisory');
+
+    for (const m of exactMatches) {
+      const cveLabel = m.cveId || m.osvId || 'CVE';
+      const isCrit = Boolean(m.inCisaKev) || m.severity === 'critical';
+      findings.push({
+        id: `sec-cve-${cveLabel.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+        category: 'security',
+        severity: isCrit ? 'critical' : 'high',
+        title: `${cveLabel} confermata su ${m.product || 'stack'} ${m.version || ''}`.trim(),
+        description: m.summary || 'Vulnerabilità nota confermata sulla versione esposta dal server.',
+        evidence: `${cveLabel}${m.inCisaKev ? ' · Presente in catalogo CISA KEV (Exploit Attivo)' : ''}${m.knownRansomware ? ' · Campagna Ransomware nota' : ''}`,
+        impact: m.inCisaKev
+          ? 'Vulnerabilità attivamente sfruttata in rete (CISA Known Exploited Vulnerabilities).'
+          : 'Esposizione a vulnerabilità ad alta severità su componente con versione esatta esposta.',
+        confidence: 0.95,
+        remediation: {
+          action: m.requiredAction || 'Applicare la patch ufficiale del vendor e nascondere i banner di versione.',
+          technicalReference: m.url || cveLabel,
+        },
+        timestamp: now,
+      });
+    }
+
+    if (advisoryMatches.length > 0) {
+      const products = Array.from(new Set(advisoryMatches.map((m) => m.product || 'Prodotto').filter(Boolean))).slice(0, 3).join(', ');
+      const sampleCves = advisoryMatches.map((m) => m.cveId).filter(Boolean).slice(0, 4).join(', ');
+      findings.push({
+        id: 'sec-kev-product-advisory',
+        category: 'governance',
+        severity: 'info',
+        title: `Verifica Patch Raccomandata (CISA KEV Advisory: ${products})`,
+        description: `Il banner espone un prodotto con CVE storiche nel catalogo CISA KEV (${sampleCves || 'varie'}). Senza versione distro completa non è confermato lo sfruttamento della build specifica.`,
+        evidence: `Prodotti rilevati: ${products} · Esempio CVE KEV: ${sampleCves || 'N/A'}`,
+        impact: 'Consigliata verifica puntuale della build/patch tramite Check Stack/SBOM.',
+        confidence: 0.6,
+        remediation: {
+          action: 'Verificare lo stato delle patch con il tab Check Rapido CVE (OSV + KEV) e disabilitare l’esposizione della versione nei banner HTTP.',
         },
         timestamp: now,
       });
